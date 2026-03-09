@@ -72,7 +72,7 @@ export const zh = {
     demoContracts: { vulnerable: 'VulnerableBank（高風險）', safe: 'SafeBank（安全）', token: 'TokenContract（中等風險）' },
     editorFile: 'Contract.sol',
     resultsBadge: '評分',
-    errorMessage: '無法連接後端。請確保後端在 3001 端口運行。',
+    errorMessage: '分析失敗。後端可能正在喚醒中（首次請求需等待 30~60 秒），請稍後再試。',
     runModules: '執行所有 5 個 AI 安全模組',
     moduleList: ['漏洞檢測', 'Exploit Graph', '安全修復建議', '評分說明', 'AI Copilot'],
   },

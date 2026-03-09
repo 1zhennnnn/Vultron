@@ -72,7 +72,7 @@ export const en = {
     demoContracts: { vulnerable: 'VulnerableBank (High Risk)', safe: 'SafeBank (Safe)', token: 'TokenContract (Medium Risk)' },
     editorFile: 'Contract.sol',
     resultsBadge: 'Score',
-    errorMessage: 'Cannot connect to backend. Ensure backend is running on port 3001.',
+    errorMessage: 'Analysis failed. Backend may be waking up (first request takes 30~60s). Please try again.',
     runModules: 'Run all 5 AI security modules',
     moduleList: ['Vulnerability Detection', 'Exploit Graph', 'Defense Engine', 'Score Explanation', 'AI Copilot'],
   },
