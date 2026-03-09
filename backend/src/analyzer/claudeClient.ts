@@ -5,7 +5,7 @@ const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
 
 async function askGemini(prompt: string, maxTokens = 800): Promise<string> {
   const model = genAI.getGenerativeModel({
-    model: 'gemini-2.0-flash',
+    model: 'gemini-1.5-flash',
     generationConfig: { maxOutputTokens: maxTokens },
   });
   const result = await model.generateContent(prompt);
