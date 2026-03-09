@@ -7,10 +7,7 @@ const app = express();
 const PORT = parseInt(process.env.PORT ?? '3001', 10);
 
 app.use(cors({
-  origin: [
-    'http://localhost:5173',
-    process.env.FRONTEND_URL ?? '',
-  ].filter(Boolean),
+  origin: true,
   methods: ['GET', 'POST'],
 }));
 
