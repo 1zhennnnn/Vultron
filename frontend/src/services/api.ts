@@ -1,6 +1,6 @@
 import { FullAnalysisResult, Vulnerability } from '../types';
 
-const BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:3001') + '/api';
+const BASE = (import.meta.env.VITE_API_URL ?? 'https://vultron.onrender.com') + '/api';
 
 async function post<T>(path: string, body: object): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
