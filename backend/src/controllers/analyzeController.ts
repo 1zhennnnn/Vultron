@@ -25,9 +25,16 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
   }
 
   try {
-    // Step 1: Real Slither static analysis
-    const slitherResult = await runSlither(code);
-    const vulnerabilities = mapSlitherToVulnerabilities(slitherResult.detectors);
+    // Step 1: Real Slither static analysis (graceful fallback if Slither fails)
+    let vulnerabilities: Vulnerability[] = [];
+    let slitherSuccess = false;
+    try {
+      const slitherResult = await runSlither(code);
+      vulnerabilities = mapSlitherToVulnerabilities(slitherResult.detectors);
+      slitherSuccess = slitherResult.success;
+    } catch (slitherErr) {
+      console.warn('Slither failed, continuing with Gemini-only analysis:', slitherErr);
+    }
 
     // Step 2: Score calculation (deterministic, instant)
     const securityScore = calculateScore(vulnerabilities);
@@ -60,7 +67,7 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
       attackStrategy: finalAttackStrategy,
       defenseRecommendations,
       scoreExplanation,
-      slitherSuccess: slitherResult.success,
+      slitherSuccess,
       analyzedAt: new Date().toISOString(),
     });
   } catch (err: any) {
