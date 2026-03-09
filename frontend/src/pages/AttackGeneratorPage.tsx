@@ -6,7 +6,7 @@ import Sidebar from '../components/Sidebar';
 import CodeEditorPanel from '../components/CodeEditorPanel';
 import ExploitGraph from '../components/ExploitGraph';
 import RiskIndicatorBadge from '../components/RiskIndicatorBadge';
-import { analyzeContract, generateAttack } from '../services/api';
+import { analyzeContract } from '../services/api';
 import { AttackStrategy } from '../types';
 
 const EXAMPLE = `// SPDX-License-Identifier: MIT
@@ -59,9 +59,8 @@ export default function AttackGeneratorPage() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     try {
-      const analysis = await analyzeContract(code);
-      const atk = await generateAttack(analysis.vulnerabilities);
-      setStrategy(atk);
+      const result = await analyzeContract(code);
+      setStrategy(result.attackStrategy);
     } catch {
       setError(t('analyzer.errorMessage'));
     } finally {
