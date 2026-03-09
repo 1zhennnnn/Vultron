@@ -20,13 +20,13 @@ app.get('/health', (_req, res) => {
     status: 'ok',
     service: 'Vultron v3',
     slither: 'enabled',
-    gemini: process.env.GEMINI_API_KEY ? 'configured' : 'missing',
+    grok: process.env.XAI_API_KEY ? 'configured' : 'missing',
   });
 });
 
 app.listen(PORT, () => {
   console.log(`Vultron v3 backend running on http://localhost:${PORT}`);
-  if (!process.env.GEMINI_API_KEY) {
-    console.warn('WARNING: GEMINI_API_KEY is not set — AI features will fail');
+  if (!process.env.XAI_API_KEY) {
+    console.warn('WARNING: XAI_API_KEY is not set — AI features will fail');
   }
 });

@@ -1,15 +1,24 @@
-import { GoogleGenerativeAI } from '@google/generative-ai';
 import { Vulnerability, AttackStrategy, DefenseRecommendation } from '../types';
 
-const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY ?? '');
-
-async function askGemini(prompt: string, maxTokens = 800): Promise<string> {
-  const model = genAI.getGenerativeModel({
-    model: 'gemini-1.5-flash',
-    generationConfig: { maxOutputTokens: maxTokens },
+async function askGrok(prompt: string, maxTokens = 800): Promise<string> {
+  const res = await fetch('https://api.x.ai/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${process.env.XAI_API_KEY ?? ''}`,
+    },
+    body: JSON.stringify({
+      model: 'grok-3-mini',
+      max_tokens: maxTokens,
+      messages: [{ role: 'user', content: prompt }],
+    }),
   });
-  const result = await model.generateContent(prompt);
-  return result.response.text();
+  if (!res.ok) {
+    const errText = await res.text();
+    throw new Error(`Grok API error ${res.status}: ${errText}`);
+  }
+  const data = await res.json() as any;
+  return data.choices[0].message.content as string;
 }
 
 function parseJson<T>(raw: string, fallback: T): T {
@@ -26,7 +35,7 @@ export async function generateSecuritySummary(
   vulnerabilities: Vulnerability[]
 ): Promise<string> {
   if (vulnerabilities.length === 0) {
-    return await askGemini(
+    return await askGrok(
       `You are a smart contract security expert. This Solidity contract passed automated analysis with no vulnerabilities detected. Write a concise 2-3 sentence security summary for the developer. Be encouraging but remind them that automated tools are not a complete guarantee.
 
 Contract:
@@ -41,7 +50,7 @@ ${code.slice(0, 2000)}
     .map(v => `- [${v.severity.toUpperCase()}] ${v.type} in ${v.function}(): ${v.description.slice(0, 120)}`)
     .join('\n');
 
-  return await askGemini(
+  return await askGrok(
     `You are a smart contract security expert. Analyze these vulnerabilities and write a concise 2-3 sentence security summary for the developer. Focus on the most critical risk and its real-world impact. Do not use bullet points.
 
 Detected vulnerabilities:
@@ -76,7 +85,7 @@ export async function generateAttackStrategy(
     (a, b) => priority.indexOf(a.severity) - priority.indexOf(b.severity)
   )[0];
 
-  const raw = await askGemini(
+  const raw = await askGrok(
     `You are a blockchain security researcher. Generate a realistic step-by-step attack strategy for this vulnerability.
 
 Vulnerability type: ${primary.type}
@@ -121,7 +130,7 @@ export async function generateDefenseRecommendations(
 
   const vulnSummary = unique.map(v => `${v.type} in ${v.function}()`).join(', ');
 
-  const raw = await askGemini(
+  const raw = await askGrok(
     `You are a Solidity security expert. Provide fix recommendations for these vulnerabilities: ${vulnSummary}
 
 Respond ONLY with a valid JSON array, no markdown, no extra text:
@@ -150,7 +159,7 @@ export async function generateScoreExplanation(
     ? vulnerabilities.map(v => `${v.severity}: ${v.type}`).join(', ')
     : 'none';
 
-  return await askGemini(
+  return await askGrok(
     `Explain this smart contract security score in 2-3 sentences for a developer. Be specific about why the score is this value.
 
 Score: ${score}/100
@@ -170,7 +179,7 @@ export async function generateCopilotAnswer(
     ? vulnerabilities.map(v => `- [${v.severity.toUpperCase()}] ${v.type} in ${v.function}(): ${v.description.slice(0, 150)}`).join('\n')
     : 'No vulnerabilities detected. Score: ' + score + '/100';
 
-  return await askGemini(
+  return await askGrok(
     `You are Vultron Copilot, an expert smart contract security assistant. Answer the developer's question based on the analyzed contract's vulnerabilities.
 
 Security context:
