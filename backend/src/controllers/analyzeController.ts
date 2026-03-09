@@ -74,7 +74,7 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
     console.error('Analysis error:', err);
     res.status(500).json({
       error: 'Analysis failed. Ensure GEMINI_API_KEY is set and Slither is installed.',
-      details: process.env.NODE_ENV === 'development' ? err.message : undefined,
+      details: err?.message ?? String(err),
     });
   }
 }
