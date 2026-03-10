@@ -16,7 +16,7 @@ app.use(cors({
   origin: (origin, cb) => {
     // Allow requests with no origin (curl, Postman, server-to-server)
     if (!origin) return cb(null, true);
-    if (allowedOrigins.some(o => origin.startsWith(o)) || origin.endsWith('.vercel.app')) {
+    if (allowedOrigins.some(o => origin.startsWith(o)) || origin.endsWith('.vercel.app') || origin.endsWith('.netlify.app')) {
       return cb(null, true);
     }
     cb(new Error(`CORS: origin ${origin} not allowed`));
