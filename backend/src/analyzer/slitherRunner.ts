@@ -1,12 +1,16 @@
 import { exec } from 'child_process';
-import { writeFileSync, unlinkSync, readFileSync, existsSync } from 'fs';
+import { writeFileSync, unlinkSync, readFileSync, existsSync, mkdirSync } from 'fs';
 import { join } from 'path';
-import { tmpdir } from 'os';
+import { platform } from 'os';
 import { promisify } from 'util';
 import { v4 as uuidv4 } from 'uuid';
 import { Vulnerability, Severity } from '../types';
 
 const execAsync = promisify(exec);
+
+// Use simple temp path to avoid Windows path parsing issues with crytic_compile
+const tmpDir = platform() === 'win32' ? 'C:\\Temp' : require('os').tmpdir();
+try { mkdirSync(tmpDir, { recursive: true }); } catch {}
 
 export interface SlitherDetector {
   check: string;
@@ -31,27 +35,52 @@ export interface SlitherRawResult {
 }
 
 const CHECK_TYPE_MAP: Record<string, string> = {
+  // Reentrancy
   'reentrancy-eth':           'reentrancy',
   'reentrancy-no-eth':        'reentrancy',
   'reentrancy-benign':        'reentrancy',
   'reentrancy-events':        'reentrancy',
+
+  // Authentication
   'tx-origin':                'tx-origin',
+
+  // Selfdestruct
   'suicidal':                 'unprotected-selfdestruct',
+
+  // Delegatecall
   'controlled-delegatecall':  'unsafe-delegatecall',
   'delegatecall-loop':        'unsafe-delegatecall',
+
+  // Unchecked calls
   'unchecked-lowlevel':       'unchecked-call',
   'unchecked-send':           'unchecked-call',
+
+  // Integer issues
   'integer-overflow':         'integer-overflow',
-  'tautology':                'logic-error',
+  'incorrect-exp':            'integer-overflow',
+  'tautology':                'integer-overflow',
+
+  // Access control
+  'missing-zero-check':       'access-control',
+  'unprotected-upgrade':      'access-control',
+  'protected-vars':           'access-control',
+  'arbitrary-send-eth':       'access-control',
+  'arbitrary-send-erc20':     'access-control',
+
+  // Timestamp / randomness
+  'weak-prng':                'timestamp-dependence',
+  'timestamp':                'timestamp-dependence',
+  'block-timestamp':          'timestamp-dependence',
+
+  // Denial of service
+  'msg-value-loop':           'denial-of-service',
+  'calls-loop':               'denial-of-service',
+  'gas-griefing':             'denial-of-service',
+
+  // Misc
   'shadowing-state':          'shadowing',
   'uninitialized-local':      'uninitialized',
   'locked-ether':             'locked-ether',
-  'arbitrary-send-eth':       'arbitrary-send',
-  'arbitrary-send-erc20':     'arbitrary-send',
-  'weak-prng':                'weak-randomness',
-  'timestamp':                'timestamp-dependence',
-  'msg-value-loop':           'msg-value-loop',
-  'calls-loop':               'gas-griefing',
 };
 
 const IMPACT_MAP: Record<string, Severity> = {
@@ -64,24 +93,65 @@ const IMPACT_MAP: Record<string, Severity> = {
 
 export async function runSlither(solidityCode: string): Promise<SlitherRawResult> {
   const id = uuidv4();
-  const tmpFile = join(tmpdir(), `vultron_${id}.sol`);
-  const outputFile = join(tmpdir(), `vultron_${id}_out.json`);
+  const tmpFile = join(tmpDir, `vultron_${id}.sol`);
+  const outputFile = join(tmpDir, `vultron_${id}_out.json`);
+  const scriptFile = join(tmpDir, `vultron_${id}_run.py`);
+
+  // Python wrapper: cd into the .sol directory and run slither with relative filename
+  // This avoids crytic_compile misparse of absolute Windows backslash paths
+  const pythonScript = `
+import subprocess
+import sys
+import os
+
+sol_file = sys.argv[1]
+output_file = sys.argv[2]
+solc_path = sys.argv[3]
+
+work_dir = os.path.dirname(sol_file)
+filename = os.path.basename(sol_file)
+
+os.chdir(work_dir)
+
+result = subprocess.run(
+    ['python', '-m', 'slither', filename,
+     '--json', output_file,
+     '--no-fail-pedantic',
+     '--disable-color',
+     '--solc', solc_path],
+    capture_output=True,
+    text=True
+)
+
+print(result.stdout)
+print(result.stderr, file=sys.stderr)
+sys.exit(result.returncode)
+`;
 
   try {
     writeFileSync(tmpFile, solidityCode, 'utf-8');
+    writeFileSync(scriptFile, pythonScript, 'utf-8');
 
-    const cmd = [
-      'slither',
-      tmpFile,
-      '--json', outputFile,
-      '--no-fail-pedantic',
-      '--disable-color',
-    ].join(' ');
+    // Use forward slashes for all paths passed to Python
+    const solPath = tmpFile.replace(/\\/g, '/');
+    const outPath = outputFile.replace(/\\/g, '/');
+    const cmd = `python "${scriptFile.replace(/\\/g, '/')}" "${solPath}" "${outPath}" "C:/Users/zhenn/solc.exe"`;
+
+    const env = {
+      ...process.env,
+      PATH: `${process.env.PATH};C:\\Users\\zhenn;C:\\Users\\zhenn\\AppData\\Roaming\\Python\\Python311\\Scripts`,
+    };
+
+    console.log('Running slither wrapper:', cmd);
+    console.log('Temp sol file:', tmpFile);
 
     try {
-      await execAsync(cmd, { timeout: 45000 });
-    } catch {
+      await execAsync(cmd, { timeout: 60000, env });
+    } catch (slitherErr: any) {
       // Slither exits non-zero when findings exist — try reading output anyway
+      console.error('Slither execution error:', slitherErr?.message ?? slitherErr);
+      console.error('Slither stderr:', slitherErr?.stderr ?? '(none)');
+      console.error('Command used:', cmd);
     }
 
     if (existsSync(outputFile)) {
@@ -92,11 +162,14 @@ export async function runSlither(solidityCode: string): Promise<SlitherRawResult
       };
     }
 
+    console.error('Slither produced no output file. Command was:', cmd);
     return { success: false, detectors: [], error: 'Slither produced no output file' };
   } catch (err: any) {
+    console.error('Slither execution error:', err?.message ?? err);
     return { success: false, detectors: [], error: String(err.message ?? err) };
   } finally {
     try { unlinkSync(tmpFile); } catch {}
+    try { unlinkSync(scriptFile); } catch {}
     try { if (existsSync(outputFile)) unlinkSync(outputFile); } catch {}
   }
 }
