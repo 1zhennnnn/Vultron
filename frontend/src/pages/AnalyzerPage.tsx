@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Loader2, ScanSearch, AlertCircle, Monitor, ChevronDown } from 'lucide-react';
+import { Loader2, ScanSearch, AlertCircle, Monitor, ChevronDown, ShieldCheck, Bot } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/Sidebar';
 import CodeEditorPanel from '../components/CodeEditorPanel';
@@ -241,9 +241,22 @@ export default function AnalyzerPage() {
               </div>
               <span className="text-xs text-slate-500 font-mono">{t('analyzer.editorFile')}</span>
               {results && (
-                <span className="ml-auto text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
-                  {t('analyzer.resultsBadge')}: {results.securityScore}/100 · {results.riskLevel}
-                </span>
+                <div className="ml-auto flex items-center gap-2">
+                  {results.slitherSuccess ? (
+                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
+                      <ShieldCheck size={11} />
+                      Slither Analyzed
+                    </span>
+                  ) : (
+                    <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
+                      <Bot size={11} />
+                      AI Only
+                    </span>
+                  )}
+                  <span className="text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
+                    {t('analyzer.resultsBadge')}: {results.securityScore}/100 · {results.riskLevel}
+                  </span>
+                </div>
               )}
             </div>
             <div style={{ height: 300 }}>

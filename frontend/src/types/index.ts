@@ -31,6 +31,7 @@ export interface FullAnalysisResult {
   attackStrategy: AttackStrategy;
   defenseRecommendations: DefenseRecommendation[];
   scoreExplanation: string;
+  slitherSuccess: boolean;
   analyzedAt: string;
 }
 

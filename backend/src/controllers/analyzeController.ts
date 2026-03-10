@@ -73,7 +73,7 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
   } catch (err: any) {
     console.error('Analysis error:', err);
     res.status(500).json({
-      error: 'Analysis failed. Ensure GEMINI_API_KEY is set and Slither is installed.',
+      error: 'Analysis failed. Ensure GROQ_API_KEY is set.',
       details: err?.message ?? String(err),
     });
   }
@@ -96,6 +96,6 @@ export async function handleCopilotChat(req: Request, res: Response): Promise<vo
     res.json({ answer });
   } catch (err: any) {
     console.error('Copilot error:', err);
-    res.status(500).json({ error: 'Copilot failed. Check ANTHROPIC_API_KEY.' });
+    res.status(500).json({ error: 'Copilot failed. Check GROQ_API_KEY.' });
   }
 }
