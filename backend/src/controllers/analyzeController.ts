@@ -7,8 +7,10 @@ import {
   generateDefenseRecommendations,
   generateScoreExplanation,
   generateCopilotAnswer,
+  askGroq,
 } from '../analyzer/claudeClient';
-import { buildAttackNarrative } from '../analyzer/causalEngine';
+import { buildAttackNarrative, generateAICausalPaths } from '../analyzer/causalEngine';
+import { generatePoCScript } from '../analyzer/pocGenerator';
 import { Vulnerability } from '../types';
 
 function extractContractName(code: string): string {
@@ -49,8 +51,16 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
         generateScoreExplanation(securityScore, vulnerabilities),
       ]);
 
-    // Step 4: Causal attack narrative (deterministic, no AI needed)
-    const narrativeSteps = buildAttackNarrative(vulnerabilities);
+    console.log('remediations count:', defenseRecommendations?.length);
+
+    // Step 4: AI causal attack paths (falls back to static rules on failure)
+    console.log('Using AI causal paths');
+    const causalResult = await generateAICausalPaths(
+      vulnerabilities,
+      (prompt) => askGroq(prompt, 2000),
+    );
+    console.log('controller causalPaths count:', causalResult.paths.length);
+    const narrativeSteps = buildAttackNarrative(vulnerabilities, causalResult.paths);
 
     // Merge: prefer Claude attack steps, fallback to narrative
     const finalAttackStrategy = {
@@ -58,8 +68,14 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
       steps: attackStrategy.steps.length >= 4 ? attackStrategy.steps : narrativeSteps,
     };
 
+    const contractName = extractContractName(code);
+
+    // Step 5: AI-generated PoC Hardhat attack script
+    const pocScript = await generatePoCScript(contractName, vulnerabilities, code, (prompt) => askGroq(prompt, 2000));
+    console.log('PoC script generated:', pocScript.length, 'chars');
+
     res.json({
-      contractName: extractContractName(code),
+      contractName,
       securityScore,
       riskLevel,
       vulnerabilities,
@@ -67,6 +83,9 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
       attackStrategy: finalAttackStrategy,
       defenseRecommendations,
       scoreExplanation,
+      causalPaths: causalResult.paths,
+      criticalPathId: causalResult.criticalPathId,
+      pocScript,
       slitherSuccess,
       analyzedAt: new Date().toISOString(),
     });

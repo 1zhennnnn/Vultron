@@ -1,6 +1,6 @@
 import { Vulnerability, AttackStrategy, DefenseRecommendation } from '../types';
 
-async function askGroq(prompt: string, maxTokens = 800): Promise<string> {
+export async function askGroq(prompt: string, maxTokens = 800): Promise<string> {
   const res = await fetch('https://api.groq.com/openai/v1/chat/completions', {
     method: 'POST',
     headers: {
@@ -36,9 +36,9 @@ export async function generateSecuritySummary(
 ): Promise<string> {
   if (vulnerabilities.length === 0) {
     return await askGroq(
-      `You are a smart contract security expert. This Solidity contract passed automated analysis with no vulnerabilities detected. Write a concise 2-3 sentence security summary for the developer. Be encouraging but remind them that automated tools are not a complete guarantee.
+      `你是一位智能合約資安專家。此 Solidity 合約通過了自動化分析，未偵測到漏洞。請用繁體中文為開發者撰寫簡潔的 2-3 句安全摘要。語氣正面，但提醒自動化工具無法提供完整保證。請完全使用繁體中文回答。
 
-Contract:
+合約內容：
 \`\`\`solidity
 ${code.slice(0, 2000)}
 \`\`\``,
@@ -51,12 +51,12 @@ ${code.slice(0, 2000)}
     .join('\n');
 
   return await askGroq(
-    `You are a smart contract security expert. Analyze these vulnerabilities and write a concise 2-3 sentence security summary for the developer. Focus on the most critical risk and its real-world impact. Do not use bullet points.
+    `你是一位智能合約資安專家。請分析以下漏洞，並用繁體中文為開發者撰寫簡潔的 2-3 句安全摘要。聚焦於最嚴重的風險及其實際影響。不要使用條列符號。請完全使用繁體中文回答。
 
-Detected vulnerabilities:
+偵測到的漏洞：
 ${vulnList}
 
-Contract (first 2000 chars):
+合約內容（前 2000 字元）：
 \`\`\`solidity
 ${code.slice(0, 2000)}
 \`\`\``,
@@ -86,17 +86,17 @@ export async function generateAttackStrategy(
   )[0];
 
   const raw = await askGroq(
-    `You are a blockchain security researcher. Generate a realistic step-by-step attack strategy for this vulnerability.
+    `你是一位區塊鏈安全研究員。請針對以下漏洞，產生真實的逐步攻擊策略。所有文字欄位必須使用繁體中文。
 
-Vulnerability type: ${primary.type}
-Affected function: ${primary.function}()
-Description: ${primary.description.slice(0, 300)}
+漏洞類型：${primary.type}
+受影響函數：${primary.function}()
+描述：${primary.description.slice(0, 300)}
 
-Respond ONLY with a valid JSON object, no markdown, no explanation:
+只回傳有效 JSON 物件，不要 markdown，不要說明文字：
 {
-  "exploitType": "string — name of the attack type",
+  "exploitType": "攻擊類型名稱（繁體中文）",
   "riskLevel": "Critical",
-  "steps": ["step 1", "step 2", "step 3", "step 4", "step 5", "step 6"]
+  "steps": ["步驟1（繁體中文）", "步驟2", "步驟3", "步驟4", "步驟5", "步驟6"]
 }`,
     500
   );
@@ -105,10 +105,10 @@ Respond ONLY with a valid JSON object, no markdown, no explanation:
     exploitType: primary.type.replace(/-/g, ' '),
     riskLevel: primary.severity === 'critical' ? 'Critical' : 'High',
     steps: [
-      `Attacker identifies ${primary.type} in ${primary.function}()`,
-      'Attacker crafts exploit transaction targeting the vulnerability',
-      'Attacker executes exploit to drain funds or corrupt state',
-      'Attack succeeds — contract compromised',
+      `攻擊者識別 ${primary.function}() 中的 ${primary.type} 漏洞`,
+      '攻擊者構造針對漏洞的惡意交易',
+      '攻擊者執行漏洞利用，提取資金或破壞合約狀態',
+      '攻擊成功，合約遭入侵',
     ],
   });
 }
@@ -131,23 +131,23 @@ export async function generateDefenseRecommendations(
   const vulnSummary = unique.map(v => `${v.type} in ${v.function}()`).join(', ');
 
   const raw = await askGroq(
-    `You are a Solidity security expert. Provide fix recommendations for these vulnerabilities: ${vulnSummary}
+    `你是一位 Solidity 資安專家。請針對以下漏洞提供修復建議：${vulnSummary}
 
-Respond ONLY with a valid JSON array, no markdown, no extra text:
+只回傳有效 JSON 陣列，不要 markdown，不要多餘文字。issue 和 strategy 欄位必須使用繁體中文，codeExample 使用 Solidity 程式碼：
 [
   {
-    "issue": "vulnerability type and function name",
-    "strategy": "one clear sentence describing the fix approach",
-    "codeExample": "3-8 lines of corrected Solidity code showing the secure pattern"
+    "issue": "漏洞類型與函數名稱（繁體中文）",
+    "strategy": "一句話描述修復方式（繁體中文）",
+    "codeExample": "3-8 行展示安全模式的 Solidity 程式碼"
   }
 ]`,
     1200
   );
 
   return parseJson<DefenseRecommendation[]>(raw, unique.map(v => ({
-    issue: `${v.type} in ${v.function}()`,
-    strategy: 'Review and apply security best practices for this vulnerability type.',
-    codeExample: '// Apply OpenZeppelin security patterns',
+    issue: `${v.type} 位於 ${v.function}()`,
+    strategy: '請檢視並套用此漏洞類型的安全最佳實務。',
+    codeExample: '// 套用 OpenZeppelin 安全模式',
   })));
 }
 
@@ -160,12 +160,10 @@ export async function generateScoreExplanation(
     : 'none';
 
   return await askGroq(
-    `Explain this smart contract security score in 2-3 sentences for a developer. Be specific about why the score is this value.
+    `請用繁體中文為開發者解釋此智能合約的安全分數，2-3 句話說明為何是這個分數。請說明具體原因。不要使用條列符號，語氣直接且具可操作性。請完全使用繁體中文回答。
 
-Score: ${score}/100
-Vulnerabilities found: ${breakdown}
-
-Do not use bullet points. Be direct and actionable.`,
+分數：${score}/100
+發現的漏洞：${breakdown}`,
     300
   );
 }
@@ -180,15 +178,15 @@ export async function generateCopilotAnswer(
     : 'No vulnerabilities detected. Score: ' + score + '/100';
 
   return await askGroq(
-    `You are Vultron Copilot, an expert smart contract security assistant. Answer the developer's question based on the analyzed contract's vulnerabilities.
+    `你是 Vultron Copilot，一位智能合約資安專家助理。請根據已分析合約的漏洞回答開發者的問題。請完全使用繁體中文回答，無論問題是什麼語言。
 
-Security context:
+資安背景：
 ${context}
-Security score: ${score}/100
+安全分數：${score}/100
 
-Developer question: "${question}"
+開發者問題：「${question}」
 
-Provide a helpful, specific answer referencing the actual vulnerabilities found. If the question is not security-related, redirect to security topics. Keep the answer concise (3-6 sentences max). Use plain text, no markdown headers.`,
+請提供具體、有幫助的回答，並引用實際偵測到的漏洞。若問題與資安無關，請引導回資安主題。回答限 3-6 句話，使用純文字，不要 markdown 標題。請完全使用繁體中文回答。`,
     400
   );
 }

@@ -54,6 +54,7 @@ const CHECK_TYPE_MAP: Record<string, string> = {
   // Unchecked calls
   'unchecked-lowlevel':       'unchecked-call',
   'unchecked-send':           'unchecked-call',
+  'unchecked-transfer':       'unchecked-call',
 
   // Integer issues
   'integer-overflow':         'integer-overflow',
