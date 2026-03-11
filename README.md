@@ -1,6 +1,6 @@
-# Vultron v2 — AI-Powered Smart Contract Security Copilot
+# Vultron — AI-Powered Smart Contract Security Copilot
 
-Vultron v2 transforms smart contract security analysis into a full AI copilot experience. Beyond detecting vulnerabilities, it generates exploit strategies, visualizes attack graphs, produces defense code, explains scores, and provides natural-language AI summaries — all powered by a mock AI engine with realistic outputs.
+Vultron  transforms smart contract security analysis into a full AI copilot experience. Beyond detecting vulnerabilities, it generates exploit strategies, visualizes attack graphs, produces defense code, explains scores, and provides natural-language AI summaries — all powered by a mock AI engine with realistic outputs.
 
 ## Features
 
