@@ -1,6 +1,7 @@
-import React, { useState, useCallback } from 'react';
-import { Loader2, ScanSearch, AlertCircle, Monitor, ChevronDown, ShieldCheck, Bot } from 'lucide-react';
+import { useState, useCallback } from 'react';
+import { Loader2, ScanSearch, AlertCircle, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
 import CodeEditorPanel from '../components/CodeEditorPanel';
 import SecurityScoreCard from '../components/SecurityScoreCard';
@@ -133,13 +134,12 @@ contract TokenContract {
 
 export default function AnalyzerPage() {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [code, setCode] = useState(CONTRACTS.vulnerable);
   const [results, setResults] = useState<FullAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [demoMode, setDemoMode] = useState(false);
   const [activeDemo, setActiveDemo] = useState<keyof typeof CONTRACTS | null>('vulnerable');
-
   const runAnalysis = useCallback(async (contractCode: string) => {
     if (!contractCode.trim() || contractCode.trim().length < 10) {
       setError(t('analyzer.errorMessage'));
@@ -151,6 +151,7 @@ export default function AnalyzerPage() {
     try {
       const result = await analyzeContract(contractCode);
       setResults(result);
+      localStorage.setItem('vultron_last_report', JSON.stringify(result));
     } catch {
       setError(t('analyzer.errorMessage'));
     } finally {
@@ -179,25 +180,16 @@ export default function AnalyzerPage() {
             <p className="text-xs text-slate-600">{t('analyzer.subtitle')}</p>
           </div>
           <div className="flex items-center gap-2">
-            {/* Demo Mode Toggle */}
-            <button
-              onClick={() => setDemoMode(v => !v)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold border transition-all duration-150 ${
-                demoMode
-                  ? 'bg-violet-600/20 border-violet-500/40 text-violet-300'
-                  : 'bg-[#1e1e30] border-[#2a2a40] text-slate-400 hover:text-white'
-              }`}
-            >
-              <Monitor size={12} />
-              {t('analyzer.demoMode')}
-              <ChevronDown size={11} className={`transition-transform ${demoMode ? 'rotate-180' : ''}`} />
-            </button>
-
             {error && (
               <div className="flex items-center gap-1.5 text-xs text-red-400 bg-red-500/8 border border-red-500/20 rounded-lg px-3 py-1.5 max-w-xs">
                 <AlertCircle size={12} />
                 <span className="truncate">{error}</span>
               </div>
+            )}
+            {results && (
+              <button onClick={() => navigate('/report')} className="btn btn-outline text-xs">
+                <FileText size={13} /> 查看完整報告
+              </button>
             )}
             <button onClick={handleAnalyze} disabled={loading} className="btn btn-primary">
               {loading
@@ -208,26 +200,24 @@ export default function AnalyzerPage() {
           </div>
         </div>
 
-        {/* Demo Mode Bar */}
-        {demoMode && (
-          <div className="flex items-center gap-2 px-5 py-2.5 bg-violet-600/5 border-b border-violet-500/20 flex-shrink-0">
-            <span className="text-xs text-violet-400 font-semibold">{t('analyzer.demoLabel')}</span>
-            {demoKeys.map(key => (
-              <button
-                key={key}
-                onClick={() => handleDemoSelect(key)}
-                disabled={loading}
-                className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-all duration-150 ${
-                  activeDemo === key
-                    ? 'bg-violet-600 text-white border-violet-500'
-                    : 'bg-[#1e1e30] text-slate-400 border-[#2a2a40] hover:text-white hover:bg-[#2a2a40]'
-                }`}
-              >
-                {t(`analyzer.demoContracts.${key}`)}
-              </button>
-            ))}
-          </div>
-        )}
+        {/* Demo contract selector (always visible) */}
+        <div className="flex items-center gap-2 px-5 py-2.5 bg-violet-600/5 border-b border-violet-500/20 flex-shrink-0">
+          <span className="text-xs text-violet-400 font-semibold">{t('analyzer.demoLabel')}</span>
+          {demoKeys.map(key => (
+            <button
+              key={key}
+              onClick={() => handleDemoSelect(key)}
+              disabled={loading}
+              className={`text-xs px-3 py-1.5 rounded-lg font-medium border transition-all duration-150 ${
+                activeDemo === key
+                  ? 'bg-violet-600 text-white border-violet-500'
+                  : 'bg-[#1e1e30] text-slate-400 border-[#2a2a40] hover:text-white hover:bg-[#2a2a40]'
+              }`}
+            >
+              {t(`analyzer.demoContracts.${key}`)}
+            </button>
+          ))}
+        </div>
 
         {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
@@ -242,17 +232,6 @@ export default function AnalyzerPage() {
               <span className="text-xs text-slate-500 font-mono">{t('analyzer.editorFile')}</span>
               {results && (
                 <div className="ml-auto flex items-center gap-2">
-                  {results.slitherSuccess ? (
-                    <span className="flex items-center gap-1 text-xs font-bold text-emerald-400 bg-emerald-500/10 border border-emerald-500/30 px-2 py-0.5 rounded-full">
-                      <ShieldCheck size={11} />
-                      Slither Analyzed
-                    </span>
-                  ) : (
-                    <span className="flex items-center gap-1 text-xs font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-2 py-0.5 rounded-full">
-                      <Bot size={11} />
-                      AI Only
-                    </span>
-                  )}
                   <span className="text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
                     {t('analyzer.resultsBadge')}: {results.securityScore}/100 · {results.riskLevel}
                   </span>

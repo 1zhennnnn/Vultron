@@ -22,6 +22,34 @@ export interface DefenseRecommendation {
   codeExample: string;
 }
 
+export interface CausalNode {
+  id: string;
+  type: 'root-cause' | 'trigger' | 'exploit-action' | 'cascade-effect' | 'final-impact';
+  label: string;
+  description: string;
+}
+
+export interface CausalEdge {
+  from: string;
+  to: string;
+  relation: string;
+}
+
+export interface CausalPath {
+  id: string;
+  from: string;
+  to: string;
+  mechanism: string;
+  edge?: string;
+  compound?: boolean;
+  title?: string;
+  severity?: string;
+  // AI-enriched fields
+  summary?: string;
+  nodes?: CausalNode[];
+  edges?: CausalEdge[];
+}
+
 export interface FullAnalysisResult {
   contractName: string;
   securityScore: number;
@@ -31,6 +59,9 @@ export interface FullAnalysisResult {
   attackStrategy: AttackStrategy;
   defenseRecommendations: DefenseRecommendation[];
   scoreExplanation: string;
+  causalPaths: CausalPath[];
+  criticalPathId: string | null;
+  pocScript?: string;
   slitherSuccess: boolean;
   analyzedAt: string;
 }

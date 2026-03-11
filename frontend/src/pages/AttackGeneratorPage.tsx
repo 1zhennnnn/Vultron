@@ -1,13 +1,14 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Zap, Play, RotateCcw, AlertTriangle, ScanSearch, Loader2, Activity } from 'lucide-react';
+import { Zap, Play, RotateCcw, AlertTriangle, ScanSearch, Loader2, Activity, Copy, Check } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import Sidebar from '../components/Sidebar';
 import CodeEditorPanel from '../components/CodeEditorPanel';
 import ExploitGraph from '../components/ExploitGraph';
 import RiskIndicatorBadge from '../components/RiskIndicatorBadge';
+import CausalPathGraph from '../components/CausalPathGraph';
 import { analyzeContract } from '../services/api';
-import { AttackStrategy } from '../types';
+import { AttackStrategy, FullAnalysisResult } from '../types';
 
 const EXAMPLE = `// SPDX-License-Identifier: MIT
 pragma solidity ^0.8.0;
@@ -48,12 +49,23 @@ export default function AttackGeneratorPage() {
   const [isSimulating, setIsSimulating] = useState(false);
   const [simDone, setSimDone] = useState(false);
   const timers = useRef<ReturnType<typeof setTimeout>[]>([]);
+  const [pocCopied, setPocCopied] = useState(false);
+  const [fullResult, setFullResult] = useState<FullAnalysisResult | null>(null);
+
+  const handleCopyPoC = useCallback(() => {
+    if (fullResult?.pocScript) {
+      navigator.clipboard.writeText(fullResult.pocScript);
+      setPocCopied(true);
+      setTimeout(() => setPocCopied(false), 2000);
+    }
+  }, [fullResult?.pocScript]);
 
   const generate = async () => {
     if (!code.trim() || code.trim().length < 10) { setError('Contract code too short.'); return; }
     setLoading(true);
     setError(null);
     setStrategy(null);
+    setFullResult(null);
     setCurrentStep(-1);
     setSimDone(false);
     timers.current.forEach(clearTimeout);
@@ -61,6 +73,7 @@ export default function AttackGeneratorPage() {
     try {
       const result = await analyzeContract(code);
       setStrategy(result.attackStrategy);
+      setFullResult(result);
     } catch {
       setError(t('analyzer.errorMessage'));
     } finally {
@@ -95,6 +108,7 @@ export default function AttackGeneratorPage() {
     timers.current.forEach(clearTimeout);
     timers.current = [];
     setStrategy(null);
+    setFullResult(null);
     setCurrentStep(-1);
     setIsSimulating(false);
     setSimDone(false);
@@ -293,6 +307,40 @@ export default function AttackGeneratorPage() {
           <div className="flex flex-col items-center justify-center py-16 gap-3 text-slate-600">
             <Zap size={32} className="text-slate-700" />
             <p className="text-sm text-slate-500">{t('attackGenerator.noStrategy')}</p>
+          </div>
+        )}
+
+        {/* AI 攻擊路徑推演 */}
+        {fullResult && fullResult.causalPaths?.length > 0 && (
+          <CausalPathGraph
+            paths={fullResult.causalPaths}
+            criticalPathId={fullResult.criticalPathId}
+          />
+        )}
+
+        {/* PoC 攻擊腳本 */}
+        {fullResult && fullResult.pocScript && fullResult.pocScript.length > 0 && (
+          <div className="card p-5">
+            <div className="flex items-center justify-between mb-3">
+              <div>
+                <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">⚔️ PoC 攻擊腳本</p>
+                <p className="text-[10px] text-slate-600 mt-0.5">AI 自動生成 · 基於真實漏洞分析</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] font-bold px-2 py-1 rounded-full bg-red-500/15 text-red-400 border border-red-500/30">
+                  ⚠️ 僅供安全研究使用
+                </span>
+                <button
+                  onClick={handleCopyPoC}
+                  className="flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border bg-[#1e1e30] border-[#2a2a40] text-slate-400 hover:text-white hover:bg-[#2a2a40] transition-all duration-150"
+                >
+                  {pocCopied ? <><Check size={12} className="text-green-400" /> 已複製</> : <><Copy size={12} /> 複製</>}
+                </button>
+              </div>
+            </div>
+            <pre className="text-xs text-slate-300 bg-[#0a0a14] border border-[#1e1e30] rounded-xl p-4 overflow-x-auto leading-relaxed font-mono whitespace-pre-wrap">
+              {fullResult.pocScript}
+            </pre>
           </div>
         )}
       </main>
