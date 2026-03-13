@@ -6,7 +6,7 @@ Vultron v3 是一套智能合約安全分析平台，整合 Slither 靜態分析
 
 | 模組 | 說明 |
 |---|---|
-| **Slither 靜態分析** | 真實執行 Slither，偵測 reentrancy、tx.origin、selfdestruct、delegatecall、integer overflow 等 27 種漏洞類型 |
+| **Slither 靜態分析** | 真實執行 Slither，偵測 reentrancy、tx.origin、selfdestruct、delegatecall、integer overflow 等 28 種漏洞類型 |
 | **確定性安全評分** | 依漏洞嚴重度計算 0–100 分（critical -40、high -25、medium -10、low -5） |
 | **AI 安全摘要** | Groq AI 針對合約內容與漏洞生成繁體中文摘要 |
 | **攻擊流程圖** | React Flow 有向圖視覺化逐步攻擊鏈 |
@@ -103,7 +103,7 @@ Frontend 執行於：`http://localhost:5173`
 | Method | Path | 說明 |
 |---|---|---|
 | `POST` | `/api/analyze` | 完整合約分析（Slither + AI） |
-| `POST` | `/api/copilot` | AI Copilot 問答 |
+| `POST` | `/api/copilot-chat` | AI Copilot 問答 |
 
 ## 頁面結構
 
