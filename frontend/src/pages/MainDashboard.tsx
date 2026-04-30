@@ -290,6 +290,27 @@ export default function MainDashboard() {
                     <p className="text-[10px] font-bold text-slate-500 uppercase tracking-widest mb-4">Remediation Strategies</p>
                     <DefenseRecommendationPanel recommendations={results?.defenseRecommendations ?? []} isLoading={loading} />
                   </div>
+                  {results?.pocScript && (
+                    <div className="card p-6 border-red-500/20 shadow-lg shadow-red-500/5">
+                      <div className="flex items-center justify-between mb-4">
+                        <div>
+                          <p className="text-[10px] font-bold text-red-400 uppercase tracking-widest flex items-center gap-2">
+                            <Terminal size={14} /> PoC Hardhat Exploit Script
+                          </p>
+                          <p className="text-[10px] text-slate-600 mt-1 uppercase tracking-tighter italic">Precision Attack Proof-of-Concept · Ethical Use Only</p>
+                        </div>
+                        <button 
+                          onClick={handleCopyPoC}
+                          className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#161625] border border-[#2a2a40] text-slate-400 text-xs hover:text-white hover:bg-[#1e1e30] transition-all"
+                        >
+                          {pocCopied ? <><Check size={14} className="text-green-500" /> Copied</> : <><Copy size={14} /> Copy Script</>}
+                        </button>
+                      </div>
+                      <pre className="p-5 rounded-2xl bg-[#05050a] border border-[#1e1e30] text-[11px] text-slate-300 font-mono overflow-x-auto leading-relaxed max-h-[400px]">
+                        {results.pocScript}
+                      </pre>
+                    </div>
+                  )}
                 </div>
               </div>
             ) : (
