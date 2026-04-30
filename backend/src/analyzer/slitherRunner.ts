@@ -108,18 +108,24 @@ import os
 sol_file = sys.argv[1]
 output_file = sys.argv[2]
 solc_path = sys.argv[3]
+extra_args = sys.argv[4:] if len(sys.argv) > 4 else []
 
 work_dir = os.path.dirname(sol_file)
 filename = os.path.basename(sol_file)
 
 os.chdir(work_dir)
 
+slither_cmd = [
+    sys.executable, '-m', 'slither', filename,
+    '--json', output_file,
+    '--no-fail-pedantic',
+    '--disable-color',
+    '--solc', solc_path
+]
+slither_cmd.extend(extra_args)
+
 result = subprocess.run(
-    ['python', '-m', 'slither', filename,
-     '--json', output_file,
-     '--no-fail-pedantic',
-     '--disable-color',
-     '--solc', solc_path],
+    slither_cmd,
     capture_output=True,
     text=True
 )
@@ -136,7 +142,12 @@ sys.exit(result.returncode)
     // Use forward slashes for all paths passed to Python
     const solPath = tmpFile.replace(/\\/g, '/');
     const outPath = outputFile.replace(/\\/g, '/');
-    const cmd = `python "${scriptFile.replace(/\\/g, '/')}" "${solPath}" "${outPath}" "C:/Users/zhenn/solc.exe"`;
+    // Add OpenZeppelin remapping if exists in backend/node_modules
+    // __dirname is backend/src/analyzer, so node_modules is 2 levels up
+    const ozPath = join(__dirname, '..', '..', 'node_modules', '@openzeppelin', 'contracts').replace(/\\/g, '/');
+    
+    // Pass as separate arguments to avoid shell quoting issues in the Python wrapper
+    const cmd = `python "${scriptFile.replace(/\\/g, '/')}" "${solPath}" "${outPath}" "C:/Users/zhenn/solc.exe" "--solc-remaps" "@openzeppelin/=${ozPath}/"`;
 
     const env = {
       ...process.env,
@@ -144,27 +155,40 @@ sys.exit(result.returncode)
     };
 
     console.log('Running slither wrapper:', cmd);
-    console.log('Temp sol file:', tmpFile);
+    console.log('process.cwd():', process.cwd());
+    console.log('ozPath:', ozPath);
 
     try {
-      await execAsync(cmd, { timeout: 60000, env });
+      const { stdout, stderr } = await execAsync(cmd, { timeout: 60000, env });
+      console.log('Slither wrapper stdout:', stdout);
+      if (stderr) console.warn('Slither wrapper stderr:', stderr);
     } catch (slitherErr: any) {
-      // Slither exits non-zero when findings exist — try reading output anyway
-      console.error('Slither execution error:', slitherErr?.message ?? slitherErr);
-      console.error('Slither stderr:', slitherErr?.stderr ?? '(none)');
-      console.error('Command used:', cmd);
+      // Slither exits non-zero (1) when findings are found, which is "normal"
+      if (slitherErr?.stdout) console.log('Slither stdout:', slitherErr.stdout);
+      if (slitherErr?.stderr) console.warn('Slither stderr:', slitherErr.stderr);
     }
 
     if (existsSync(outputFile)) {
-      const raw = JSON.parse(readFileSync(outputFile, 'utf-8'));
-      return {
-        success: true,
-        detectors: raw.results?.detectors ?? [],
-      };
+      try {
+        const content = readFileSync(outputFile, 'utf-8');
+        if (!content.trim()) {
+          console.error('Slither output file is empty');
+          return { success: false, detectors: [], error: 'Empty output' };
+        }
+        const raw = JSON.parse(content);
+        console.log('Slither parsed detectors count:', raw.results?.detectors?.length ?? 0);
+        return {
+          success: true,
+          detectors: raw.results?.detectors ?? [],
+        };
+      } catch (parseErr: any) {
+        console.error('Failed to parse Slither output JSON:', parseErr);
+        return { success: false, detectors: [], error: 'Parse error' };
+      }
     }
 
-    console.error('Slither produced no output file. Command was:', cmd);
-    return { success: false, detectors: [], error: 'Slither produced no output file' };
+    console.error('Slither produced no output file at:', outputFile);
+    return { success: false, detectors: [], error: 'No output file produced' };
   } catch (err: any) {
     console.error('Slither execution error:', err?.message ?? err);
     return { success: false, detectors: [], error: String(err.message ?? err) };

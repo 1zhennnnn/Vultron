@@ -197,7 +197,8 @@ export default function DashboardPage() {
                       item.riskLevel === 'Critical Risk' ? 'critical' :
                       item.riskLevel === 'High Risk' ? 'high' :
                       item.riskLevel === 'Medium Risk' ? 'medium' :
-                      item.riskLevel === 'Low Risk' ? 'low' : 'info'
+                      item.riskLevel === 'Low Risk' ? 'low' :
+                      item.riskLevel === 'Safe' ? 'safe' : 'info'
                     } size="sm" />
                   </td>
                   <td className="py-2.5 pr-4"><span className="text-sm text-slate-400">{item.vulnerabilityCount}</span></td>

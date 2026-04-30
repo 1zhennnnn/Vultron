@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo } from 'react';
 import { Bot, Sparkles, Send, User } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Vulnerability } from '../types';
@@ -15,9 +15,10 @@ interface Props {
   isLoading: boolean;
   vulnerabilities: Vulnerability[];
   score: number;
+  selectedVulnerability?: { lineNumber?: number; line?: number; label: string } | null;
 }
 
-export default function SecurityCopilotPanel({ summary, isLoading, vulnerabilities, score }: Props) {
+export default function SecurityCopilotPanel({ summary, isLoading, vulnerabilities, score, selectedVulnerability }: Props) {
   const { t } = useTranslation();
   const [displayedSummary, setDisplayedSummary] = useState('');
   const [summaryTyping, setSummaryTyping] = useState(false);
@@ -30,6 +31,25 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
   const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const chatEndRef = useRef<HTMLDivElement>(null);
   const nextId = useRef(0);
+
+  const selectedLine = selectedVulnerability?.lineNumber || selectedVulnerability?.line;
+  const selectedLabel = selectedVulnerability?.label;
+
+  // Quick Prompts based on real context
+  const quickPrompts = useMemo(() => {
+    if (selectedLine) {
+      return [
+        { label: `Explain: ${selectedLabel}`, query: `Can you explain why "${selectedLabel}" at line ${selectedLine} is a risk?` },
+        { label: `How to fix Line ${selectedLine}`, query: `Provide a specific code fix for the issue at line ${selectedLine}.` },
+        { label: 'Attack Vector', query: `How would an attacker exploit the vulnerability at line ${selectedLine}?` }
+      ];
+    }
+    return [
+      { label: 'Summarize Risks', query: 'What are the top 3 critical risks in this contract?' },
+      { label: 'How to Fix All', query: 'Provide a general plan to fix these vulnerabilities.' },
+      { label: 'Gas Optimization', query: 'Are there any gas optimization suggestions?' }
+    ];
+  }, [selectedLine, selectedLabel]);
 
   useEffect(() => {
     if (summaryTimerRef.current) clearInterval(summaryTimerRef.current);
@@ -98,7 +118,6 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
     if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(input); }
   };
 
-  const suggestions = t('copilot.questions', { returnObjects: true }) as string[];
   const isActive = isLoading || summaryTyping || isSending || isStreamTyping;
 
   return (
@@ -193,18 +212,24 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
         </div>
       )}
 
-      {/* Suggested Questions */}
-      {!isLoading && displayedSummary && messages.length === 0 && !isSending && (
+      {/* Suggested Questions / Quick Prompts */}
+      {!isLoading && displayedSummary && !isSending && (
         <div className="px-4 pt-3 pb-2 border-b border-[#1e1e30]">
-          <p className="text-[10px] text-slate-500 mb-2">{t('copilot.suggestedLabel')}</p>
+          <p className="text-[10px] text-slate-500 mb-2">
+            {selectedLine ? `Context: Line ${selectedLine}` : t('copilot.suggestedLabel')}
+          </p>
           <div className="flex gap-1.5 flex-wrap">
-            {suggestions.map((q: string, i: number) => (
+            {quickPrompts.map((p, i) => (
               <button
                 key={i}
-                onClick={() => sendMessage(q)}
-                className="text-[11px] px-2.5 py-1 rounded-full bg-violet-500/8 border border-violet-500/20 text-violet-400 hover:bg-violet-500/15 transition-colors"
+                onClick={() => sendMessage(p.query)}
+                className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${
+                  selectedLine 
+                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' 
+                    : 'bg-violet-500/8 border-violet-500/20 text-violet-400 hover:bg-violet-500/15'
+                }`}
               >
-                {q}
+                {p.label}
               </button>
             ))}
           </div>
@@ -220,7 +245,7 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isSending}
-            placeholder={t('copilot.chatPlaceholder')}
+            placeholder={selectedLine ? `Ask about "${selectedLabel}" (L${selectedLine})...` : t('copilot.chatPlaceholder')}
             className="flex-1 bg-[#0f0f1a] border border-[#1e1e30] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 transition-colors disabled:opacity-50"
           />
           <button

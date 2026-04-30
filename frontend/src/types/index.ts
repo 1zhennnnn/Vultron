@@ -27,6 +27,7 @@ export interface CausalNode {
   type: 'root-cause' | 'trigger' | 'exploit-action' | 'cascade-effect' | 'final-impact';
   label: string;
   description: string;
+  lineNumber?: number;
 }
 
 export interface CausalEdge {

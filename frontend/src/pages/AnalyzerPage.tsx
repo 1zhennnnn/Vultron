@@ -3,6 +3,7 @@ import { Loader2, ScanSearch, AlertCircle, FileText } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { useNavigate } from 'react-router-dom';
 import Sidebar from '../components/Sidebar';
+import ErrorBoundary from '../components/ErrorBoundary';
 import CodeEditorPanel from '../components/CodeEditorPanel';
 import SecurityScoreCard from '../components/SecurityScoreCard';
 import VulnerabilityList from '../components/VulnerabilityList';
@@ -12,6 +13,7 @@ import DefenseRecommendationPanel from '../components/DefenseRecommendationPanel
 import ScoreExplanationPanel from '../components/ScoreExplanationPanel';
 import RiskHeatmap from '../components/RiskHeatmap';
 import ExploitKnowledgePanel from '../components/ExploitKnowledgePanel';
+import CausalPathGraph from '../components/CausalPathGraph';
 import { analyzeContract } from '../services/api';
 import { FullAnalysisResult } from '../types';
 
@@ -140,6 +142,11 @@ export default function AnalyzerPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [activeDemo, setActiveDemo] = useState<keyof typeof CONTRACTS | null>('vulnerable');
+
+  const [selectedVulnerability, setSelectedVulnerability] = useState<any | null>(null);
+  const [currentStep, setCurrentStep] = useState<number>(-1);
+  const [isPlaying, setIsPlaying] = useState(false);
+
   const runAnalysis = useCallback(async (contractCode: string) => {
     if (!contractCode.trim() || contractCode.trim().length < 10) {
       setError(t('analyzer.errorMessage'));
@@ -148,6 +155,9 @@ export default function AnalyzerPage() {
     setLoading(true);
     setError(null);
     setResults(null);
+    setSelectedVulnerability(null);
+    setCurrentStep(-1);
+    setIsPlaying(false);
     try {
       const result = await analyzeContract(contractCode);
       setResults(result);
@@ -166,6 +176,10 @@ export default function AnalyzerPage() {
     setCode(CONTRACTS[key]);
     runAnalysis(CONTRACTS[key]);
   };
+
+  const handleVulnerabilitySelect = useCallback((vulnerability: any) => {
+    setSelectedVulnerability(vulnerability);
+  }, []);
 
   const demoKeys: (keyof typeof CONTRACTS)[] = ['vulnerable', 'safe', 'token'];
 
@@ -188,7 +202,7 @@ export default function AnalyzerPage() {
             )}
             {results && (
               <button onClick={() => navigate('/report')} className="btn btn-outline text-xs">
-                <FileText size={13} /> 查看完整報告
+                <FileText size={13} /> {t('analyzer.viewReportButton')}
               </button>
             )}
             <button onClick={handleAnalyze} disabled={loading} className="btn btn-primary">
@@ -200,7 +214,7 @@ export default function AnalyzerPage() {
           </div>
         </div>
 
-        {/* Demo contract selector (always visible) */}
+        {/* Demo contract selector */}
         <div className="flex items-center gap-2 px-5 py-2.5 bg-violet-600/5 border-b border-violet-500/20 flex-shrink-0">
           <span className="text-xs text-violet-400 font-semibold">{t('analyzer.demoLabel')}</span>
           {demoKeys.map(key => (
@@ -219,7 +233,6 @@ export default function AnalyzerPage() {
           ))}
         </div>
 
-        {/* Scrollable content */}
         <div className="flex-1 overflow-y-auto">
           {/* Editor */}
           <div className="border-b border-[#1e1e30]">
@@ -230,36 +243,39 @@ export default function AnalyzerPage() {
                 <span className="w-2.5 h-2.5 rounded-full bg-green-500/50" />
               </div>
               <span className="text-xs text-slate-500 font-mono">{t('analyzer.editorFile')}</span>
-              {results && (
-                <div className="ml-auto flex items-center gap-2">
-                  <span className="text-xs font-bold text-violet-400 bg-violet-500/10 border border-violet-500/20 px-2 py-0.5 rounded-full">
-                    {t('analyzer.resultsBadge')}: {results.securityScore}/100 · {results.riskLevel}
-                  </span>
-                </div>
-              )}
             </div>
-            <div style={{ height: 300 }}>
-              <CodeEditorPanel value={code} onChange={setCode} height="300px" />
+            <div style={{ height: 400 }}>
+              <ErrorBoundary fallbackTitle={t('analyzer.errors.editor')}>
+                <CodeEditorPanel 
+                  value={code} 
+                  onChange={setCode} 
+                  height="400px" 
+                  selectedVulnerability={selectedVulnerability}
+                />
+              </ErrorBoundary>
             </div>
           </div>
 
-          {/* Results */}
           {(results || loading) && (
             <div className="p-5 flex flex-col gap-5">
               {/* Row 1: Score + Explanation | Vulnerabilities + Heatmap */}
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 <div className="card p-5 flex flex-col gap-4">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">{t('analyzer.scoreSection')}</p>
                   <div className="flex justify-center">
                     {loading ? (
                       <div className="skeleton w-32 h-32 rounded-full" />
-                    ) : results && (
-                      <SecurityScoreCard score={results.securityScore} riskLevel={results.riskLevel} />
+                    ) : (
+                      <ErrorBoundary fallbackTitle={t('analyzer.errors.scoreCard')}>
+                        <SecurityScoreCard score={results?.securityScore ?? 0} riskLevel={results?.riskLevel ?? 'Safe'} />
+                      </ErrorBoundary>
                     )}
                   </div>
                   <div>
                     <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">{t('analyzer.scoreExplanation')}</p>
-                    <ScoreExplanationPanel explanation={results?.scoreExplanation ?? ''} isLoading={loading} />
+                    <ErrorBoundary fallbackTitle={t('analyzer.errors.scoreExpl')}>
+                      <ScoreExplanationPanel explanation={results?.scoreExplanation ?? ''} isLoading={loading} />
+                    </ErrorBoundary>
                   </div>
                 </div>
 
@@ -269,48 +285,99 @@ export default function AnalyzerPage() {
                   </p>
                   {loading ? (
                     <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="skeleton h-14 rounded-xl" />)}</div>
-                  ) : results && <VulnerabilityList vulnerabilities={results.vulnerabilities} />}
+                  ) : (
+                    <ErrorBoundary fallbackTitle={t('analyzer.errors.vulnList')}>
+                      <VulnerabilityList vulnerabilities={results?.vulnerabilities ?? []} />
+                    </ErrorBoundary>
+                  )}
 
-                  {(results || loading) && (
-                    <>
-                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-2">{t('analyzer.riskHeatmap')}</p>
-                      {loading ? (
-                        <div className="skeleton h-24 rounded-xl" />
-                      ) : results && <RiskHeatmap vulnerabilities={results.vulnerabilities} />}
-                    </>
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mt-2">{t('analyzer.riskHeatmap')}</p>
+                  {loading ? (
+                    <div className="skeleton h-24 rounded-xl" />
+                  ) : (
+                    <ErrorBoundary fallbackTitle={t('analyzer.errors.heatmap')}>
+                      <RiskHeatmap vulnerabilities={results?.vulnerabilities ?? []} />
+                    </ErrorBoundary>
                   )}
                 </div>
               </div>
 
               {/* Row 2: Exploit Graph | Defense */}
-              <div className="grid grid-cols-2 gap-5">
+              <div className="grid grid-cols-1 xl:grid-cols-2 gap-5">
                 <div className="card p-5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('analyzer.exploitGraph')}</p>
-                  {loading ? <div className="skeleton h-64 rounded-xl" /> : results && <ExploitGraph steps={results.attackStrategy.steps} />}
+                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                    {t('analyzer.exploitGraph.title')}
+                  </p>
+                  {loading ? (
+                    <div className="skeleton h-64 rounded-xl" />
+                  ) : results?.attackStrategy ? (
+                    <ErrorBoundary fallbackTitle={t('analyzer.errors.exploitGraph')}>
+                      <ExploitGraph 
+                        steps={results.attackStrategy.steps || []} 
+                        onNodeClick={handleVulnerabilitySelect}
+                        currentStep={currentStep}
+                        setCurrentStep={setCurrentStep}
+                        isPlaying={isPlaying}
+                        setIsPlaying={setIsPlaying}
+                      />
+                    </ErrorBoundary>
+                  ) : (
+                    <div className="h-64 flex items-center justify-center text-slate-600 bg-[#0f0f1a] rounded-xl border border-dashed border-[#1e1e30]">
+                      {t('analyzer.exploitGraph.noData')}
+                    </div>
+                  )}
                 </div>
+                
                 <div className="card p-5">
                   <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('analyzer.defenseRec')}</p>
-                  <DefenseRecommendationPanel recommendations={results?.defenseRecommendations ?? []} isLoading={loading} />
+                  <ErrorBoundary fallbackTitle={t('analyzer.errors.defenseRec')}>
+                    <DefenseRecommendationPanel recommendations={results?.defenseRecommendations ?? []} isLoading={loading} />
+                  </ErrorBoundary>
                 </div>
               </div>
 
-              {/* Row 3: Knowledge Base */}
-              {results && results.vulnerabilities.length > 0 && (
+              {/* Row 3: Causal Paths */}
+              {(results?.causalPaths || loading) && (
                 <div className="card p-5">
-                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('analyzer.knowledgeBase')}</p>
-                  <ExploitKnowledgePanel vulnerabilities={results.vulnerabilities} />
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">
+                    {t('analyzer.causalGraph.sectionTitle')}
+                  </p>
+                  {loading ? (
+                    <div className="skeleton h-64 rounded-xl" />
+                  ) : (
+                    <ErrorBoundary fallbackTitle={t('analyzer.errors.causalGraph')}>
+                      <CausalPathGraph 
+                        paths={results?.causalPaths ?? []} 
+                        criticalPathId={results?.criticalPathId ?? null}
+                        onNodeClick={handleVulnerabilitySelect} 
+                      />
+                    </ErrorBoundary>
+                  )}
                 </div>
               )}
 
-              {/* Row 4: Copilot */}
+              {/* Row 4: Knowledge Base */}
+              {!loading && results && results.vulnerabilities.length > 0 && (
+                <div className="card p-5">
+                  <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('analyzer.knowledgeBase')}</p>
+                  <ErrorBoundary fallbackTitle={t('analyzer.errors.knowledge')}>
+                    <ExploitKnowledgePanel vulnerabilities={results.vulnerabilities} />
+                  </ErrorBoundary>
+                </div>
+              )}
+
+              {/* Row 5: Copilot */}
               <div>
                 <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-3">{t('analyzer.aiCopilot')}</p>
-                <SecurityCopilotPanel
-                  summary={results?.summary ?? ''}
-                  isLoading={loading}
-                  vulnerabilities={results?.vulnerabilities ?? []}
-                  score={results?.securityScore ?? 100}
-                />
+                <ErrorBoundary fallbackTitle={t('analyzer.errors.copilot')}>
+                  <SecurityCopilotPanel
+                    summary={results?.summary ?? ''}
+                    isLoading={loading}
+                    vulnerabilities={results?.vulnerabilities ?? []}
+                    score={results?.securityScore ?? 100}
+                    selectedVulnerability={selectedVulnerability}
+                  />
+                </ErrorBoundary>
               </div>
             </div>
           )}
@@ -323,9 +390,11 @@ export default function AnalyzerPage() {
               </div>
               <p className="text-sm text-slate-500">{t('analyzer.placeholder')}</p>
               <div className="flex gap-2 flex-wrap justify-center">
-                {(t('analyzer.moduleList', { returnObjects: true }) as string[]).map((m: string) => (
-                  <span key={m} className="text-xs px-2 py-1 bg-[#13131f] border border-[#1e1e30] rounded-lg text-slate-500">{m}</span>
-                ))}
+                {Array.isArray(t('analyzer.moduleList', { returnObjects: true })) && 
+                  (t('analyzer.moduleList', { returnObjects: true }) as string[]).map((m: string) => (
+                    <span key={m} className="text-xs px-2 py-1 bg-[#13131f] border border-[#1e1e30] rounded-lg text-slate-500">{m}</span>
+                  ))
+                }
               </div>
             </div>
           )}

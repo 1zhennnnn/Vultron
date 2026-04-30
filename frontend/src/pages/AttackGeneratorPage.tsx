@@ -199,9 +199,11 @@ export default function AttackGeneratorPage() {
               <div className="flex items-center gap-2">
                 <span className="text-sm font-bold text-white">{strategy.exploitType}</span>
                 <RiskIndicatorBadge severity={
-                  strategy.riskLevel.toLowerCase() === 'critical' ? 'critical' :
-                  strategy.riskLevel.toLowerCase() === 'high' ? 'high' :
-                  strategy.riskLevel.toLowerCase() === 'medium' ? 'medium' : 'low'
+                  strategy.riskLevel.toLowerCase() === 'critical' || strategy.riskLevel.toLowerCase() === 'critical risk' ? 'critical' :
+                  strategy.riskLevel.toLowerCase() === 'high' || strategy.riskLevel.toLowerCase() === 'high risk' ? 'high' :
+                  strategy.riskLevel.toLowerCase() === 'medium' || strategy.riskLevel.toLowerCase() === 'medium risk' ? 'medium' :
+                  strategy.riskLevel.toLowerCase() === 'low' || strategy.riskLevel.toLowerCase() === 'low risk' ? 'low' : 
+                  strategy.riskLevel.toLowerCase() === 'safe' ? 'safe' : 'info'
                 } size="sm" />
               </div>
 

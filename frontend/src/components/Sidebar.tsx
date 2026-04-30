@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ScanSearch, Zap, FileText, Shield } from 'lucide-react';
+import { LayoutDashboard, ScanSearch, FileText, Shield } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageToggle from './LanguageToggle';
 
@@ -11,7 +11,6 @@ export default function Sidebar() {
   const nav = [
     { icon: LayoutDashboard, labelKey: 'sidebar.dashboard', to: '/dashboard' },
     { icon: ScanSearch, labelKey: 'sidebar.analyzer', to: '/analyzer' },
-    { icon: Zap, labelKey: 'sidebar.attackGenerator', to: '/attack-generator' },
     { icon: FileText, labelKey: 'sidebar.reports', to: '/report' },
   ];
 

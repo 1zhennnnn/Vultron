@@ -73,7 +73,7 @@ export default function RiskHeatmap({ vulnerabilities }: Props) {
           <Tooltip
             contentStyle={{ background: '#13131f', border: '1px solid #1e1e30', borderRadius: 8, fontSize: 12, color: '#e2e8f0' }}
             formatter={(value: number, _: string, props: any) => [
-              `${props.payload.severity.toUpperCase()} · ${value}/100`,
+              `${(props.payload.severity || 'low').toUpperCase()} · ${value}/100`,
               t('heatmap.xLabel'),
             ]}
             labelFormatter={(label: string) => `${label}()`}

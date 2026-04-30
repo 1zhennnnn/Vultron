@@ -6,12 +6,17 @@ export async function generatePoCScript(
   contractCode: string,
   callGroq: (prompt: string) => Promise<string>,
 ): Promise<string> {
-  const criticalVulns = vulnerabilities
-    .filter(v => v.severity === 'critical' || v.severity === 'high')
-    .map(v => `- ${v.type} in ${v.function}() at line ${v.lineNumber ?? '?'}: ${v.description}`)
+  const targetVulns = vulnerabilities
+    .filter(v => ['critical', 'high', 'medium'].includes(v.severity))
+    .map(v => `- [${v.severity.toUpperCase()}] ${v.type} in ${v.function}() at line ${v.lineNumber ?? '?'}: ${v.description}`)
     .join('\n');
 
-  if (!criticalVulns) return '';
+  if (!targetVulns) {
+    return `// Vultron 安全驗證
+// 未偵測到可利用的 Critical、High 或 Medium 級別漏洞。
+// 此合約目前在自動化測試中表現為【安全】。
+// 建議定期進行人工審計以確保邏輯正確性。`;
+  }
 
   const prompt = `You are a smart contract security researcher.
 Given this Solidity contract named "${contractName}":
@@ -19,7 +24,7 @@ Given this Solidity contract named "${contractName}":
 ${contractCode.substring(0, 2000)}
 
 With these vulnerabilities detected:
-${criticalVulns}
+${targetVulns}
 
 Generate a complete, runnable Hardhat test file that demonstrates the attack exploitation. The script should:
 1. Deploy the vulnerable contract

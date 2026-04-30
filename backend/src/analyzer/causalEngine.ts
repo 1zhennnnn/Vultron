@@ -5,6 +5,7 @@ interface CausalNode {
   type: 'root-cause' | 'trigger' | 'exploit-action' | 'cascade-effect' | 'final-impact';
   label: string;
   description: string;
+  lineNumber?: number;
 }
 
 interface CausalEdge {
@@ -238,14 +239,20 @@ function buildPathFromTemplate(
 }
 
 export function buildCausalPaths(vulnerabilities: Vulnerability[]): CausalPathResult {
-  console.log('causalEngine input:', vulnerabilities.map(v => v.type));
+  const actionable = vulnerabilities.filter(v => v.severity !== 'info');
+  console.log('causalEngine input:', actionable.map(v => v.type));
 
-  const types = new Set(vulnerabilities.map(v => v.type));
+  if (actionable.length === 0) {
+    console.log('buildCausalPaths: no actionable vulns — skipping path generation');
+    return { paths: [], criticalPathId: null };
+  }
+
+  const types = new Set(actionable.map(v => v.type));
   const paths: CausalPath[] = [];
 
   // Per-vulnerability template paths (one entry node per detected vuln type)
   for (const template of NARRATIVE_TEMPLATES) {
-    const match = vulnerabilities.find(v => v.type === template.type);
+    const match = actionable.find(v => v.type === template.type);
     console.log('checking template:', template.type, '→ match:', !!match);
     if (match) {
       const path = buildPathFromTemplate(template, match);
@@ -301,9 +308,9 @@ export function buildCausalPaths(vulnerabilities: Vulnerability[]): CausalPathRe
 
 export function buildAttackNarrative(vulnerabilities: Vulnerability[], prebuiltPaths?: CausalPath[] | CausalPathResult): string[] {
   const priority = ['critical', 'high', 'medium', 'low', 'info'];
-  const sorted = [...vulnerabilities].sort(
-    (a, b) => priority.indexOf(a.severity) - priority.indexOf(b.severity)
-  );
+  const sorted = vulnerabilities
+    .filter(v => v.severity !== 'info')
+    .sort((a, b) => priority.indexOf(a.severity) - priority.indexOf(b.severity));
 
   if (sorted.length === 0) {
     return [
@@ -388,11 +395,8 @@ Generate a JSON causal attack path analysis. Return ONLY valid JSON, no markdown
       "to": "vulnerability-type",
       "mechanism": "one sentence causal link",
       "nodes": [
-        { "id": "n0", "type": "root-cause", "label": "short label", "description": "detail under 20 words" },
-        { "id": "n1", "type": "trigger", "label": "short label", "description": "detail under 20 words" },
-        { "id": "n2", "type": "exploit-action", "label": "short label", "description": "detail under 20 words" },
-        { "id": "n3", "type": "cascade-effect", "label": "short label", "description": "detail under 20 words" },
-        { "id": "n4", "type": "final-impact", "label": "short label", "description": "detail under 20 words" }
+        { "id": "n0", "type": "root-cause", "label": "short label", "description": "detail", "lineNumber": 16 },
+        { "id": "n1", "type": "trigger", "label": "short label", "description": "detail", "lineNumber": 18 }
       ],
       "edges": [
         { "from": "n0", "to": "n1", "relation": "enables" },
@@ -411,7 +415,9 @@ Rules:
 - Maximum 4 paths total
 - Node types must be: root-cause, trigger, exploit-action, cascade-effect, final-impact
 - severity must match the vulnerability severity
-- Keep labels under 6 words, descriptions under 20 words`;
+- Keep labels under 6 words, descriptions under 20 words
+- Provide "lineNumber" for nodes mapping to specific code (use the numbers provided above)
+- Omit "lineNumber" for abstract impact or trigger nodes that don't map to a specific line`;
 
   try {
     const raw = await callGroq(prompt);

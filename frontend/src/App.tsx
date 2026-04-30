@@ -2,8 +2,7 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import LandingPage from './pages/LandingPage';
 import DashboardPage from './pages/DashboardPage';
-import AnalyzerPage from './pages/AnalyzerPage';
-import AttackGeneratorPage from './pages/AttackGeneratorPage';
+import MainDashboard from './pages/MainDashboard';
 import ReportPage from './pages/ReportPage';
 
 export default function App() {
@@ -12,8 +11,7 @@ export default function App() {
       <Routes>
         <Route path="/" element={<LandingPage />} />
         <Route path="/dashboard" element={<DashboardPage />} />
-        <Route path="/analyzer" element={<AnalyzerPage />} />
-        <Route path="/attack-generator" element={<AttackGeneratorPage />} />
+        <Route path="/analyzer" element={<MainDashboard />} />
         <Route path="/report" element={<ReportPage />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>

@@ -1,10 +1,12 @@
 import { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Zap, ArrowDown } from 'lucide-react';
 import { CausalPath, CausalNode } from '../types';
 
 interface Props {
   paths: CausalPath[];
   criticalPathId: string | null;
+  onNodeClick: (payload: { lineNumber?: number; line?: number; label: string }) => void;
 }
 
 const NODE_STYLES: Record<CausalNode['type'], { bg: string; border: string; text: string; dot: string }> = {
@@ -15,16 +17,14 @@ const NODE_STYLES: Record<CausalNode['type'], { bg: string; border: string; text
   'final-impact':   { bg: 'bg-red-900/30',    border: 'border-red-700/60',    text: 'text-red-200',    dot: 'bg-red-700' },
 };
 
-const NODE_LABELS: Record<CausalNode['type'], string> = {
-  'root-cause':     'Root Cause',
-  'trigger':        'Trigger',
-  'exploit-action': 'Exploit Action',
-  'cascade-effect': 'Cascade Effect',
-  'final-impact':   'Final Impact',
-};
+function parseLineNumber(text: string): number | null {
+  const match = text.match(/(?:line|L)\s?(\d+)/i);
+  return match ? parseInt(match[1], 10) : null;
+}
 
-function PathGraph({ path }: { path: CausalPath }) {
-  // If AI returned nodes/edges, use them; otherwise render a single mechanism card
+function PathGraph({ path, onNodeClick }: { path: CausalPath; onNodeClick: Props['onNodeClick'] }) {
+  const { t } = useTranslation();
+  
   if (!path.nodes || path.nodes.length === 0) {
     return (
       <div className="flex flex-col items-center gap-0">
@@ -38,9 +38,13 @@ function PathGraph({ path }: { path: CausalPath }) {
     );
   }
 
-  // Build edge lookup: nodeId → relation label going out from it
   const edgeMap = new Map<string, string>();
   (path.edges ?? []).forEach(e => edgeMap.set(e.from, e.relation));
+
+  const handleNodeClick = (node: CausalNode) => {
+    const line = node.lineNumber || parseLineNumber(node.description) || parseLineNumber(node.label);
+    onNodeClick({ line: line || undefined, label: node.label });
+  };
 
   return (
     <div className="flex flex-col items-center gap-0">
@@ -51,14 +55,16 @@ function PathGraph({ path }: { path: CausalPath }) {
 
         return (
           <div key={node.id} className="flex flex-col items-center w-full max-w-lg">
-            {/* Node card */}
-            <div className={`w-full rounded-xl border p-4 ${style.bg} ${style.border} shadow-sm`}>
+            <div 
+              onClick={() => handleNodeClick(node)}
+              className={`w-full rounded-xl border p-4 cursor-pointer transition-all hover:scale-[1.02] active:scale-[0.98] ${style.bg} ${style.border} shadow-sm hover:shadow-violet-500/20`}
+            >
               <div className="flex items-start gap-3">
                 <div className={`mt-0.5 w-2 h-2 rounded-full flex-shrink-0 ${style.dot}`} />
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <span className={`text-[10px] font-bold uppercase tracking-widest ${style.text}`}>
-                      {NODE_LABELS[node.type]}
+                      {t(`analyzer.causalGraph.nodeTypes.${node.type}`, node.type.replace(/-/g, ' '))}
                     </span>
                   </div>
                   <p className="text-sm font-semibold text-white leading-snug">{node.label}</p>
@@ -67,7 +73,6 @@ function PathGraph({ path }: { path: CausalPath }) {
               </div>
             </div>
 
-            {/* Connector arrow between nodes */}
             {!isLast && (
               <div className="flex flex-col items-center py-1.5 gap-0.5">
                 <div className="w-px h-3 bg-violet-500/30" />
@@ -82,7 +87,6 @@ function PathGraph({ path }: { path: CausalPath }) {
         );
       })}
 
-      {/* Summary footer */}
       {path.summary && (
         <p className="mt-5 text-xs text-slate-500 italic text-center max-w-lg leading-relaxed border-t border-[#1e1e30] pt-4 w-full">
           {path.summary}
@@ -92,7 +96,8 @@ function PathGraph({ path }: { path: CausalPath }) {
   );
 }
 
-export default function CausalPathGraph({ paths, criticalPathId }: Props) {
+export default function CausalPathGraph({ paths, criticalPathId, onNodeClick }: Props) {
+  const { t } = useTranslation();
   const [activeId, setActiveId] = useState<string>(
     criticalPathId ?? paths[0]?.id ?? ''
   );
@@ -110,13 +115,13 @@ export default function CausalPathGraph({ paths, criticalPathId }: Props) {
 
   return (
     <div className="card p-5">
-      {/* Section header */}
       <div className="flex items-center gap-2 mb-4">
         <Zap size={13} className="text-amber-400" />
-        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">AI 攻擊路徑推演</p>
+        <p className="text-xs font-semibold text-slate-400 uppercase tracking-wider">
+          {t('analyzer.causalGraph.title')}
+        </p>
       </div>
 
-      {/* Path tabs */}
       {paths.length > 1 && (
         <div className="flex flex-wrap gap-2 mb-5">
           {paths.map(p => {
@@ -135,7 +140,7 @@ export default function CausalPathGraph({ paths, criticalPathId }: Props) {
                 {p.title ?? p.id}
                 {isCritical && (
                   <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-                    Critical
+                    {t('analyzer.causalGraph.criticalLabel')}
                   </span>
                 )}
               </button>
@@ -144,37 +149,16 @@ export default function CausalPathGraph({ paths, criticalPathId }: Props) {
         </div>
       )}
 
-      {/* Single path header when only one path */}
-      {paths.length === 1 && (
-        <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-sm font-bold text-white">{activePath.title ?? activePath.id}</h3>
-          {activePath.severity && (
-            <span className={`text-xs font-bold uppercase ${severityColor[activePath.severity] ?? 'text-slate-400'}`}>
-              {activePath.severity}
-            </span>
-          )}
-          {activePath.id === criticalPathId && (
-            <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-red-500/20 text-red-400 border border-red-500/30 animate-pulse">
-              Critical Path
-            </span>
-          )}
-        </div>
-      )}
+      <div className="flex items-center gap-2 mb-4">
+        <h3 className="text-sm font-bold text-white">{activePath.title ?? activePath.id}</h3>
+        {activePath.severity && (
+          <span className={`text-xs font-bold uppercase ${severityColor[activePath.severity] ?? 'text-slate-400'}`}>
+            {activePath.severity}
+          </span>
+        )}
+      </div>
 
-      {/* Active path title (multi-tab mode) */}
-      {paths.length > 1 && (
-        <div className="flex items-center gap-2 mb-4">
-          <h3 className="text-sm font-bold text-white">{activePath.title ?? activePath.id}</h3>
-          {activePath.severity && (
-            <span className={`text-xs font-bold uppercase ${severityColor[activePath.severity] ?? 'text-slate-400'}`}>
-              {activePath.severity}
-            </span>
-          )}
-        </div>
-      )}
-
-      {/* Graph */}
-      <PathGraph path={activePath} />
+      <PathGraph path={activePath} onNodeClick={onNodeClick} />
     </div>
   );
 }

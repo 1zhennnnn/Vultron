@@ -54,7 +54,7 @@ export default function LandingPage() {
         </div>
         <div className="flex items-center gap-4">
           <button onClick={() => navigate('/dashboard')} className="text-sm text-slate-400 hover:text-white transition-colors">{t('landing.navDashboard')}</button>
-          <button onClick={() => navigate('/attack-generator')} className="text-sm text-slate-400 hover:text-white transition-colors">{t('landing.navAttackSim')}</button>
+          <button onClick={() => navigate('/analyzer')} className="text-sm text-slate-400 hover:text-white transition-colors">{t('landing.navAttackSim')}</button>
           <button onClick={() => navigate('/analyzer')} className="btn btn-primary text-sm">{t('landing.navAnalyzer')}</button>
           <LanguageToggle />
         </div>
@@ -92,7 +92,7 @@ export default function LandingPage() {
             {t('landing.launchAnalyzer')} <ChevronRight size={18} />
           </button>
           <button
-            onClick={() => navigate('/attack-generator')}
+            onClick={() => navigate('/analyzer')}
             className="flex items-center gap-2 px-7 py-3.5 bg-[#13131f] hover:bg-[#1a1a2e] text-white font-semibold rounded-xl border border-[#1e1e30] transition-all duration-200 text-base"
           >
             {t('landing.viewDemoAttack')} <Zap size={16} className="text-orange-400" />

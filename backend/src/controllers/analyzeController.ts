@@ -8,6 +8,7 @@ import {
   generateScoreExplanation,
   generateCopilotAnswer,
   askGroq,
+  analyzeContractWithAI,
 } from '../analyzer/claudeClient';
 import { buildAttackNarrative, generateAICausalPaths } from '../analyzer/causalEngine';
 import { generatePoCScript } from '../analyzer/pocGenerator';
@@ -27,29 +28,36 @@ export async function handleAnalyze(req: Request, res: Response): Promise<void> 
   }
 
   try {
-    // Step 1: Real Slither static analysis (graceful fallback if Slither fails)
+    // Step 1: Real Slither static analysis
     let vulnerabilities: Vulnerability[] = [];
     let slitherSuccess = false;
     try {
       const slitherResult = await runSlither(code);
       vulnerabilities = mapSlitherToVulnerabilities(slitherResult.detectors);
       slitherSuccess = slitherResult.success;
+      console.log(`Slither analysis complete. Found ${vulnerabilities.length} vulnerabilities.`);
     } catch (slitherErr) {
-      console.warn('Slither failed, continuing with Gemini-only analysis:', slitherErr);
+      console.warn('Slither execution error, will fallback to AI:', slitherErr);
     }
 
-    // Step 2: Score calculation (deterministic, instant)
+    // Step 2: AI Fallback if Slither finds nothing or fails
+    // Slither is great but sometimes misses things or fails to compile
+    if (vulnerabilities.length === 0) {
+      console.log('Slither found no issues. Running AI security scan fallback...');
+      const aiVulns = await analyzeContractWithAI(code);
+      vulnerabilities = aiVulns;
+      console.log(`AI scan complete. Found ${vulnerabilities.length} vulnerabilities.`);
+    }
+
+    // Step 3: Score calculation (deterministic, instant)
     const securityScore = calculateScore(vulnerabilities);
     const riskLevel = getRiskLevel(securityScore);
 
-    // Step 3: All Claude AI calls in parallel
-    const [summary, attackStrategy, defenseRecommendations, scoreExplanation] =
-      await Promise.all([
-        generateSecuritySummary(code, vulnerabilities),
-        generateAttackStrategy(vulnerabilities),
-        generateDefenseRecommendations(vulnerabilities),
-        generateScoreExplanation(securityScore, vulnerabilities),
-      ]);
+    // Step 3: Sequential AI calls to avoid Groq rate limits
+    const summary = await generateSecuritySummary(code, vulnerabilities);
+    const attackStrategy = await generateAttackStrategy(vulnerabilities);
+    const defenseRecommendations = await generateDefenseRecommendations(vulnerabilities);
+    const scoreExplanation = await generateScoreExplanation(securityScore, vulnerabilities);
 
     console.log('remediations count:', defenseRecommendations?.length);
 
