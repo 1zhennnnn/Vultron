@@ -127,10 +127,18 @@ function MatrixRain() {
             p.y += p.speed;
             if (p.y > initH) p.y = Math.random() * -50;
           }
-        } else {
-          // phase 2 — stay formed with gentle flicker
+        } else if (phase === 2) {
+          // hold — stay formed with gentle flicker
           p.x = p.tx + (Math.random() - 0.5);
           p.y = p.ty + (Math.random() - 0.5);
+        } else {
+          // phase 3 — scatter back into rain
+          p.y += p.speed * 1.5;
+          p.x += (Math.random() - 0.5) * 2;
+          if (p.y > initH) {
+            p.y = Math.random() * -100;
+            p.x = p.tx;
+          }
         }
 
         ctx.shadowBlur  = (phase >= 1) ? 6 : 0;
@@ -141,11 +149,11 @@ function MatrixRain() {
         ctx.shadowBlur  = 0;
       }
 
-      // Advance phase 0 → 1 → 2, then lock at 2 forever
+      // Cycle phase 0 → 1 → 2 → 3 → 0 → ...
       pTimer++;
-      if (pTimer >= PHASE_DURS[phase] && phase < 2) {
+      if (pTimer >= PHASE_DURS[phase]) {
         pTimer = 0;
-        phase  = phase + 1;
+        phase  = (phase + 1) % 4;
         if (phase === 1) revealY = initH;
       }
 
