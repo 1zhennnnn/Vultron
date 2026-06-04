@@ -1,14 +1,10 @@
 import React, { useEffect, useState, useRef, useMemo } from 'react';
-import { Bot, Sparkles, Send, User } from 'lucide-react';
+import { Terminal, Send, User, Bot } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { Vulnerability } from '../types';
 import { copilotChat } from '../services/api';
 
-interface ChatMessage {
-  role: 'user' | 'ai';
-  text: string;
-  id: number;
-}
+interface ChatMessage { role: 'user' | 'ai'; text: string; id: number; }
 
 interface Props {
   summary: string;
@@ -19,97 +15,75 @@ interface Props {
 }
 
 export default function SecurityCopilotPanel({ summary, isLoading, vulnerabilities, score, selectedVulnerability }: Props) {
-  const { t } = useTranslation();
-  const [displayedSummary, setDisplayedSummary] = useState('');
-  const [summaryTyping, setSummaryTyping] = useState(false);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [input, setInput] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [streamedAnswer, setStreamedAnswer] = useState('');
-  const [isStreamTyping, setIsStreamTyping] = useState(false);
+  const { t, i18n } = useTranslation();
+  const [displayedSummary, setDisplayedSummary]     = useState('');
+  const [summaryTyping,    setSummaryTyping]         = useState(false);
+  const [messages,         setMessages]             = useState<ChatMessage[]>([]);
+  const [input,            setInput]                = useState('');
+  const [isSending,        setIsSending]            = useState(false);
+  const [streamedAnswer,   setStreamedAnswer]       = useState('');
+  const [isStreamTyping,   setIsStreamTyping]       = useState(false);
   const summaryTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const streamTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const chatEndRef = useRef<HTMLDivElement>(null);
-  const nextId = useRef(0);
+  const streamTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const chatEndRef      = useRef<HTMLDivElement>(null);
+  const nextId          = useRef(0);
 
-  const selectedLine = selectedVulnerability?.lineNumber || selectedVulnerability?.line;
+  const selectedLine  = selectedVulnerability?.lineNumber || selectedVulnerability?.line;
   const selectedLabel = selectedVulnerability?.label;
 
-  // Quick Prompts based on real context
   const quickPrompts = useMemo(() => {
-    if (selectedLine) {
-      return [
-        { label: `Explain: ${selectedLabel}`, query: `Can you explain why "${selectedLabel}" at line ${selectedLine} is a risk?` },
-        { label: `How to fix Line ${selectedLine}`, query: `Provide a specific code fix for the issue at line ${selectedLine}.` },
-        { label: 'Attack Vector', query: `How would an attacker exploit the vulnerability at line ${selectedLine}?` }
-      ];
-    }
+    if (selectedLine) return [
+      { label: `Explain L${selectedLine}`,   query: `Can you explain why "${selectedLabel}" at line ${selectedLine} is a risk?` },
+      { label: `Fix L${selectedLine}`,        query: `Provide a specific code fix for the issue at line ${selectedLine}.` },
+      { label: 'Attack Vector',               query: `How would an attacker exploit the vulnerability at line ${selectedLine}?` },
+    ];
     return [
-      { label: 'Summarize Risks', query: 'What are the top 3 critical risks in this contract?' },
-      { label: 'How to Fix All', query: 'Provide a general plan to fix these vulnerabilities.' },
-      { label: 'Gas Optimization', query: 'Are there any gas optimization suggestions?' }
+      { label: 'Top Risks',       query: 'What are the top 3 critical risks in this contract?' },
+      { label: 'Fix All',         query: 'Provide a general plan to fix these vulnerabilities.' },
+      { label: 'Gas Optimization', query: 'Are there any gas optimization suggestions?' },
     ];
   }, [selectedLine, selectedLabel]);
 
   useEffect(() => {
     if (summaryTimerRef.current) clearInterval(summaryTimerRef.current);
     if (!summary) { setDisplayedSummary(''); return; }
-    setDisplayedSummary('');
-    setSummaryTyping(true);
+    setDisplayedSummary(''); setSummaryTyping(true);
     let i = 0;
     summaryTimerRef.current = setInterval(() => {
       i++;
       setDisplayedSummary(summary.slice(0, i));
-      if (i >= summary.length) {
-        clearInterval(summaryTimerRef.current!);
-        setSummaryTyping(false);
-      }
+      if (i >= summary.length) { clearInterval(summaryTimerRef.current!); setSummaryTyping(false); }
     }, 12);
     return () => { if (summaryTimerRef.current) clearInterval(summaryTimerRef.current); };
   }, [summary]);
 
-  useEffect(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, streamedAnswer]);
+  useEffect(() => { chatEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages, streamedAnswer]);
 
   const typeAnswer = (text: string, onDone: () => void) => {
     if (streamTimerRef.current) clearInterval(streamTimerRef.current);
-    setStreamedAnswer('');
-    setIsStreamTyping(true);
+    setStreamedAnswer(''); setIsStreamTyping(true);
     let i = 0;
     streamTimerRef.current = setInterval(() => {
       i++;
       setStreamedAnswer(text.slice(0, i));
-      if (i >= text.length) {
-        clearInterval(streamTimerRef.current!);
-        setIsStreamTyping(false);
-        onDone();
-      }
+      if (i >= text.length) { clearInterval(streamTimerRef.current!); setIsStreamTyping(false); onDone(); }
     }, 10);
   };
 
   const sendMessage = async (question: string) => {
     if (!question.trim() || isSending) return;
-    const userMsg: ChatMessage = { role: 'user', text: question, id: nextId.current++ };
-    setMessages(prev => [...prev, userMsg]);
-    setInput('');
-    setIsSending(true);
-    setStreamedAnswer('');
+    setMessages(prev => [...prev, { role: 'user', text: question, id: nextId.current++ }]);
+    setInput(''); setIsSending(true); setStreamedAnswer('');
     try {
-      const res = await copilotChat(question, vulnerabilities, score);
+      const res = await copilotChat(question, vulnerabilities, score, i18n.language);
       typeAnswer(res.answer, () => {
-        const aiMsg: ChatMessage = { role: 'ai', text: res.answer, id: nextId.current++ };
-        setMessages(prev => [...prev, aiMsg]);
-        setStreamedAnswer('');
-        setIsSending(false);
+        setMessages(prev => [...prev, { role: 'ai', text: res.answer, id: nextId.current++ }]);
+        setStreamedAnswer(''); setIsSending(false);
       });
     } catch {
-      const errMsg: ChatMessage = {
-        role: 'ai',
-        text: 'Sorry, I could not connect to the backend. Please ensure the server is running on port 3001.',
-        id: nextId.current++,
-      };
-      setMessages(prev => [...prev, errMsg]);
+      setMessages(prev => [...prev, {
+        role: 'ai', text: 'Backend connection failed. Ensure the server is running.', id: nextId.current++,
+      }]);
       setIsSending(false);
     }
   };
@@ -121,88 +95,84 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
   const isActive = isLoading || summaryTyping || isSending || isStreamTyping;
 
   return (
-    <div className="card-glow flex flex-col" style={{ animation: isActive ? 'glowPulse 2s ease-in-out infinite' : 'none' }}>
+    <div className="border border-[#1f2937] flex flex-col">
       {/* Header */}
-      <div className="flex items-center gap-3 p-4 border-b border-[#1e1e30]">
-        <div className="w-9 h-9 rounded-xl bg-violet-600/20 border border-violet-500/30 flex items-center justify-center">
-          <Bot size={18} className="text-violet-400" />
+      <div className="flex items-center gap-2.5 px-3 py-2 bg-[#0f1117] border-b border-[#1f2937]">
+        <div className="w-7 h-7 border border-[#3b82f6] flex items-center justify-center flex-shrink-0">
+          <Bot size={13} className="text-[#3b82f6]" />
         </div>
-        <div>
-          <p className="text-sm font-bold text-white flex items-center gap-1.5">
-            {t('copilot.title')} <Sparkles size={12} className="text-violet-400" />
+        <div className="flex-1">
+          <p className="text-[10px] font-bold tracking-widest text-[#e2e8f0] uppercase">
+            {t('copilot.title')}
           </p>
-          <p className="text-xs text-slate-500">{t('copilot.subtitle')}</p>
+          <p className="text-[9px] text-[#64748b]">{t('copilot.subtitle')}</p>
         </div>
         {isActive && (
-          <div className="ml-auto flex items-center gap-1">
-            {[0, 150, 300].map(d => (
-              <span key={d} className="w-1.5 h-1.5 rounded-full bg-violet-400 animate-bounce" style={{ animationDelay: `${d}ms` }} />
+          <div className="flex items-center gap-1">
+            {[0, 120, 240].map(d => (
+              <span key={d} className="w-1 h-1 bg-[#3b82f6] animate-bounce" style={{ animationDelay: `${d}ms` }} />
             ))}
           </div>
         )}
       </div>
 
       {/* AI Summary */}
-      <div className="p-4 border-b border-[#1e1e30]">
-        <p className="text-[10px] font-semibold text-violet-400 uppercase tracking-wider mb-2">{t('copilot.summaryLabel')}</p>
+      <div className="p-3 border-b border-[#1f2937]">
+        <p className="section-label mb-2">{t('copilot.summaryLabel')}</p>
         {isLoading ? (
           <div className="space-y-1.5">
-            {[1, 2, 3].map(i => <div key={i} className="skeleton h-3.5 rounded" style={{ width: `${90 - i * 8}%` }} />)}
+            {[1, 2, 3].map(i => <div key={i} className="skeleton h-3" style={{ width: `${90 - i * 8}%` }} />)}
           </div>
         ) : (
-          <div className="text-sm text-slate-300 leading-relaxed whitespace-pre-wrap min-h-[40px]">
+          <div className="text-[11px] text-[#94a3b8] leading-relaxed whitespace-pre-wrap min-h-[36px] font-mono">
             {displayedSummary}
-            {summaryTyping && <span className="inline-block w-0.5 h-4 bg-violet-400 ml-0.5 animate-pulse" />}
+            {summaryTyping && <span className="inline-block w-0.5 h-3.5 bg-[#3b82f6] ml-0.5 animate-pulse" />}
             {!displayedSummary && !summaryTyping && (
-              <span className="text-slate-600 italic text-xs">{t('copilot.waitPrompt')}</span>
+              <span className="text-[#374151] italic text-[10px]">{t('copilot.waitPrompt')}</span>
             )}
           </div>
         )}
       </div>
 
-      {/* Chat Thread */}
-      {(messages.length > 0 || (isSending && streamedAnswer === '' && !isStreamTyping)) && (
-        <div className="flex flex-col gap-3 p-4 max-h-72 overflow-y-auto border-b border-[#1e1e30]">
-          <p className="text-[10px] font-semibold text-slate-500 uppercase tracking-wider">{t('copilot.chatLabel')}</p>
+      {/* Chat thread */}
+      {(messages.length > 0 || (isSending && !isStreamTyping)) && (
+        <div className="flex flex-col gap-2 p-3 max-h-60 overflow-y-auto border-b border-[#1f2937]">
+          <p className="section-label">{t('copilot.chatLabel')}</p>
           {messages.map(msg => (
             <div key={msg.id} className={`flex gap-2 ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}>
               {msg.role === 'ai' && (
-                <div className="w-6 h-6 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <Bot size={11} className="text-violet-400" />
+                <div className="w-5 h-5 border border-[#3b82f6] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <Bot size={9} className="text-[#3b82f6]" />
                 </div>
               )}
-              <div className={`max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed whitespace-pre-wrap ${
+              <div className={`max-w-[85%] px-2.5 py-2 text-[11px] leading-relaxed whitespace-pre-wrap border ${
                 msg.role === 'user'
-                  ? 'bg-violet-600/20 border border-violet-500/25 text-violet-100'
-                  : 'bg-[#1e1e30] border border-[#2a2a40] text-slate-300'
+                  ? 'border-[#f97316] bg-[rgba(249,115,22,0.08)] text-[#fdba74]'
+                  : 'border-[#1f2937] bg-[#0f1117] text-[#94a3b8]'
               }`}>
                 {msg.text}
               </div>
               {msg.role === 'user' && (
-                <div className="w-6 h-6 rounded-full bg-slate-700 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <User size={11} className="text-slate-400" />
+                <div className="w-5 h-5 border border-[#374151] flex items-center justify-center flex-shrink-0 mt-0.5">
+                  <User size={9} className="text-[#64748b]" />
                 </div>
               )}
             </div>
           ))}
-          {/* Streaming / thinking */}
-          {(isSending) && (
-            <div className="flex gap-2 justify-start">
-              <div className="w-6 h-6 rounded-full bg-violet-600/20 border border-violet-500/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-                <Bot size={11} className="text-violet-400" />
+          {isSending && (
+            <div className="flex gap-2">
+              <div className="w-5 h-5 border border-[#3b82f6] flex items-center justify-center flex-shrink-0 mt-0.5">
+                <Bot size={9} className="text-[#3b82f6]" />
               </div>
-              <div className="max-w-[85%] rounded-xl px-3 py-2 text-xs leading-relaxed bg-[#1e1e30] border border-[#2a2a40] text-slate-300 whitespace-pre-wrap">
+              <div className="px-2.5 py-2 border border-[#1f2937] bg-[#0f1117] text-[11px] text-[#94a3b8] whitespace-pre-wrap">
                 {streamedAnswer ? (
-                  <>
-                    {streamedAnswer}
-                    {isStreamTyping && <span className="inline-block w-0.5 h-3.5 bg-violet-400 ml-0.5 animate-pulse" />}
-                  </>
+                  <>{streamedAnswer}{isStreamTyping && <span className="inline-block w-0.5 h-3 bg-[#3b82f6] ml-0.5 animate-pulse" />}</>
                 ) : (
-                  <span className="text-slate-500 flex items-center gap-1.5">
+                  <span className="text-[#374151] flex items-center gap-1">
                     {t('copilot.thinking')}
-                    <span className="inline-flex gap-0.5 ml-1">
-                      {[0, 100, 200].map(d => <span key={d} className="w-1 h-1 rounded-full bg-slate-500 animate-bounce" style={{ animationDelay: `${d}ms` }} />)}
-                    </span>
+                    {[0, 80, 160].map(d => (
+                      <span key={d} className="w-1 h-1 bg-[#374151] animate-bounce inline-block" style={{ animationDelay: `${d}ms` }} />
+                    ))}
                   </span>
                 )}
               </div>
@@ -212,21 +182,21 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
         </div>
       )}
 
-      {/* Suggested Questions / Quick Prompts */}
+      {/* Quick prompts */}
       {!isLoading && displayedSummary && !isSending && (
-        <div className="px-4 pt-3 pb-2 border-b border-[#1e1e30]">
-          <p className="text-[10px] text-slate-500 mb-2">
-            {selectedLine ? `Context: Line ${selectedLine}` : t('copilot.suggestedLabel')}
+        <div className="px-3 pt-2 pb-2 border-b border-[#1f2937]">
+          <p className="text-[9px] text-[#374151] mb-2 uppercase tracking-widest font-bold">
+            {selectedLine ? `CTX: Line ${selectedLine}` : t('copilot.suggestedLabel')}
           </p>
           <div className="flex gap-1.5 flex-wrap">
             {quickPrompts.map((p, i) => (
               <button
                 key={i}
                 onClick={() => sendMessage(p.query)}
-                className={`text-[11px] px-2.5 py-1 rounded-full border transition-all ${
-                  selectedLine 
-                    ? 'bg-amber-500/10 border-amber-500/30 text-amber-400 hover:bg-amber-500/20' 
-                    : 'bg-violet-500/8 border-violet-500/20 text-violet-400 hover:bg-violet-500/15'
+                className={`text-[9px] px-2 py-1 border tracking-wider font-bold uppercase transition-all ${
+                  selectedLine
+                    ? 'border-[#f59e0b] text-[#f59e0b] bg-[rgba(245,158,11,0.08)] hover:bg-[rgba(245,158,11,0.15)]'
+                    : 'border-[#1f2937] text-[#64748b] hover:border-[#374151] hover:text-[#94a3b8]'
                 }`}
               >
                 {p.label}
@@ -238,22 +208,22 @@ export default function SecurityCopilotPanel({ summary, isLoading, vulnerabiliti
 
       {/* Input */}
       {!isLoading && displayedSummary && (
-        <div className="p-3 flex gap-2 items-center">
+        <div className="p-2 flex gap-1.5">
           <input
             type="text"
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
             disabled={isSending}
-            placeholder={selectedLine ? `Ask about "${selectedLabel}" (L${selectedLine})...` : t('copilot.chatPlaceholder')}
-            className="flex-1 bg-[#0f0f1a] border border-[#1e1e30] rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-violet-500/50 transition-colors disabled:opacity-50"
+            placeholder={selectedLine ? `Query L${selectedLine}…` : t('copilot.chatPlaceholder')}
+            className="flex-1 bg-[#0f1117] border border-[#1f2937] px-2.5 py-1.5 text-[11px] text-[#e2e8f0] placeholder-[#374151] focus:outline-none focus:border-[#3b82f6] transition-colors disabled:opacity-50 font-mono"
           />
           <button
             onClick={() => sendMessage(input)}
             disabled={!input.trim() || isSending}
-            className="btn btn-primary text-xs px-3 py-2 flex-shrink-0 disabled:opacity-40"
+            className="btn btn-outline px-3 py-1.5 flex-shrink-0 disabled:opacity-30"
           >
-            {isSending ? t('copilot.sendingButton') : <><Send size={12} />{t('copilot.sendButton')}</>}
+            {isSending ? t('copilot.sendingButton') : <Send size={11} />}
           </button>
         </div>
       )}

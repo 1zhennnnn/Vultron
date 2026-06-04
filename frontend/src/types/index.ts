@@ -8,6 +8,11 @@ export interface Vulnerability {
   severity: Severity;
   description: string;
   lineNumber?: number;
+  recommendation?: string;
+  exploitability_score?: number;
+  exploitability_level?: 'HIGH' | 'MEDIUM' | 'LOW';
+  exploitability_conditions?: Array<{ condition: string; weight: number; met: boolean }>;
+  exploitability_summary?: string;
 }
 
 export interface AttackStrategy {
@@ -28,6 +33,8 @@ export interface CausalNode {
   label: string;
   description: string;
   lineNumber?: number;
+  hallucination_risk?: boolean;
+  anchored_to_slither?: boolean;
 }
 
 export interface CausalEdge {
@@ -45,6 +52,7 @@ export interface CausalPath {
   compound?: boolean;
   title?: string;
   severity?: string;
+  low_confidence?: boolean;
   // AI-enriched fields
   summary?: string;
   nodes?: CausalNode[];
@@ -65,6 +73,44 @@ export interface FullAnalysisResult {
   pocScript?: string;
   slitherSuccess: boolean;
   analyzedAt: string;
+  analysisLanguage?: string;
+  solidity_version?: string;
+  solc_used?: string;
+  complexity?: {
+    complexity_score: number;
+    complexity_level: 'HIGH' | 'MEDIUM' | 'LOW';
+    complexity_note: string;
+    metrics: {
+      loc: number;
+      function_count: number;
+      public_function_count: number;
+      state_variable_count: number;
+      external_call_count: number;
+      modifier_count: number;
+      event_count: number;
+      inheritance_depth: number;
+    };
+  };
+  performance?: {
+    total_ms: number;
+    slither_ms: number;
+    groq_ms: number;
+    exploitability_ms: number;
+    validation_ms: number;
+  };
+  hallucination?: {
+    validation_passed: boolean;
+    hallucination_count: number;
+    hallucination_rate: number;
+  };
+  consensus?: {
+    runs: number;
+    successful_runs: number;
+    high_confidence_paths: number;
+    low_confidence_paths: number;
+    consensus_rate: number;
+    note: string;
+  };
 }
 
 export interface ScanHistoryItem {

@@ -13,21 +13,23 @@ export default function DefenseRecommendationPanel({ recommendations, isLoading 
 
   if (isLoading) {
     return (
-      <div className="space-y-3">
-        <div className="flex gap-2">
-          {[1, 2, 3].map(i => <div key={i} className="skeleton h-8 w-28 rounded-lg" />)}
+      <div className="space-y-2">
+        <div className="flex gap-1">
+          {[1, 2, 3].map(i => <div key={i} className="skeleton h-7 w-20" />)}
         </div>
-        <div className="skeleton h-32 rounded-xl" />
-        <div className="skeleton h-32 rounded-xl" />
+        <div className="skeleton h-28" />
+        <div className="skeleton h-28" />
       </div>
     );
   }
 
   if (!recommendations.length) {
     return (
-      <div className="flex flex-col items-center py-8 gap-2 text-slate-500">
-        <Shield size={28} className="text-green-500" />
-        <p className="text-sm">No critical defense actions required</p>
+      <div className="flex flex-col items-center py-8 gap-2">
+        <div className="w-8 h-8 border border-[#10b981] flex items-center justify-center">
+          <Shield size={14} className="text-[#10b981]" />
+        </div>
+        <p className="text-[11px] text-[#10b981] font-bold uppercase tracking-widest">No Remediation Required</p>
       </div>
     );
   }
@@ -35,37 +37,39 @@ export default function DefenseRecommendationPanel({ recommendations, isLoading 
   const current = recommendations[Math.min(active, recommendations.length - 1)];
 
   return (
-    <div className="flex flex-col gap-4">
-      {/* Tabs */}
-      <div className="flex gap-2 flex-wrap">
+    <div className="flex flex-col gap-3">
+      {/* Tab selectors */}
+      <div className="flex gap-1 flex-wrap">
         {recommendations.map((r, i) => (
           <button
             key={i}
             onClick={() => setActive(i)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all duration-150 ${
+            className={`px-3 py-1 text-[10px] font-bold tracking-widest uppercase border transition-all ${
               active === i
-                ? 'bg-violet-600 text-white'
-                : 'bg-[#1e1e30] text-slate-400 hover:text-white hover:bg-[#2a2a40]'
+                ? 'border-[#f97316] bg-[rgba(249,115,22,0.1)] text-[#f97316]'
+                : 'border-[#1f2937] text-[#64748b] hover:border-[#374151] hover:text-[#94a3b8]'
             }`}
           >
-            Fix #{i + 1}
+            FIX #{i + 1}
           </button>
         ))}
       </div>
 
       {/* Content */}
-      <div className="space-y-3 animate-fade-in" key={active}>
-        <div className="flex items-start gap-2">
-          <ChevronRight size={14} className="text-violet-400 mt-0.5 flex-shrink-0" />
-          <div>
-            <p className="text-sm font-semibold text-white">{current.issue}</p>
-            <p className="text-xs text-slate-400 mt-1 leading-relaxed">{current.strategy}</p>
+      <div className="animate-fade-in" key={active}>
+        <div className="border border-[#1f2937] p-3 mb-3 bg-[#0f1117]">
+          <div className="flex items-start gap-2">
+            <ChevronRight size={12} className="text-[#f97316] mt-0.5 flex-shrink-0" />
+            <div>
+              <p className="text-xs font-semibold text-[#e2e8f0]">{current.issue}</p>
+              <p className="text-[11px] text-[#94a3b8] mt-1 leading-relaxed">{current.strategy}</p>
+            </div>
           </div>
         </div>
 
-        <div className="rounded-xl overflow-hidden border border-[#1e1e30]">
-          <div className="px-3 py-2 bg-[#0f0f1a] border-b border-[#1e1e30] flex items-center gap-2">
-            <span className="text-xs text-slate-500 font-mono">Secure Implementation</span>
+        <div className="border border-[#1f2937] overflow-hidden">
+          <div className="px-3 py-1.5 bg-[#0f1117] border-b border-[#1f2937] flex items-center gap-2">
+            <span className="text-[9px] font-bold tracking-widest text-[#64748b] uppercase">Secure Implementation</span>
           </div>
           <Editor
             height="160px"
@@ -74,12 +78,12 @@ export default function DefenseRecommendationPanel({ recommendations, isLoading 
             theme="vs-dark"
             options={{
               readOnly: true,
-              fontSize: 12,
+              fontSize: 11,
               fontFamily: "'JetBrains Mono', monospace",
               minimap: { enabled: false },
               scrollBeyondLastLine: false,
               lineNumbers: 'off',
-              padding: { top: 10 },
+              padding: { top: 8 },
               wordWrap: 'on',
               folding: false,
               contextmenu: false,

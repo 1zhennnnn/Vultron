@@ -1,12 +1,14 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { analyzeContract } from '../services/api';
+import { analyzeContractWithProgress, ProgressData } from '../services/api';
 import { FullAnalysisResult, AttackStrategy, Vulnerability } from '../types';
+import i18n from '../i18n/i18n';
 
 export function useVultronAnalysis(initialCode: string) {
   const [code, setCode] = useState(initialCode);
   const [results, setResults] = useState<FullAnalysisResult | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [progress, setProgress] = useState<ProgressData | null>(null);
   
   // Animation/Simulation State
   const [currentStep, setCurrentStep] = useState(-1);
@@ -30,21 +32,23 @@ export function useVultronAnalysis(initialCode: string) {
     
     setLoading(true);
     setError(null);
-    // Note: We might NOT want to clear previous results immediately to avoid layout shift
-    // but clearing simulation state is a must
+    setProgress(null);
     setCurrentStep(-1);
     setIsSimulating(false);
     setSimDone(false);
     clearTimers();
 
     try {
-      const result = await analyzeContract(contractCode);
-      setResults(result);
-      localStorage.setItem('vultron_last_report', JSON.stringify(result));
+      const analysisLanguage = i18n.language;
+      const result = await analyzeContractWithProgress(contractCode, setProgress, analysisLanguage);
+      const resultWithLang: FullAnalysisResult = { ...result, analysisLanguage };
+      setResults(resultWithLang);
+      localStorage.setItem('vultron_last_report', JSON.stringify(resultWithLang));
     } catch (err) {
       setError('Analysis failed. Check your connection and GROQ_API_KEY.');
     } finally {
       setLoading(false);
+      setProgress(null);
     }
   }, [clearTimers]);
 
@@ -90,11 +94,13 @@ export function useVultronAnalysis(initialCode: string) {
     results,
     loading,
     error,
+    progress,
     runAnalysis,
     // Simulation
     currentStep,
     setCurrentStep,
     isSimulating,
+    setIsSimulating,
     simDone,
     simulateAttack,
     resetSimulation,

@@ -32,6 +32,7 @@ export const zh = {
     analyzer: '分析器',
     attackGenerator: '攻擊模擬',
     reports: '安全報告',
+    vulnerabilities: '漏洞資料庫',
     copilotActive: 'AI Copilot 運行中',
     engineLabel: 'Vultron-Sec-v2 引擎',
   },

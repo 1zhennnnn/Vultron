@@ -1,34 +1,25 @@
-FROM node:20-slim
-
-# Install Python + system dependencies for Slither
-RUN apt-get update && apt-get install -y \
-    python3 \
-    python3-pip \
-    python3-venv \
-    git \
-    curl \
-    && rm -rf /var/lib/apt/lists/*
-
-# Install Slither via pip (break-system-packages for Debian 12+)
-RUN pip3 install slither-analyzer --break-system-packages
-
-# Install solc 0.8.20 static binary
-RUN curl -Lo /usr/local/bin/solc \
-    https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux \
-    && chmod +x /usr/local/bin/solc
+FROM python:3.11-slim
 
 WORKDIR /app
 
-# Install all dependencies (including devDeps for TypeScript build)
-COPY package*.json ./
-RUN npm ci
+# System deps: curl for solc download, git for slither
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    curl \
+    git \
+    && rm -rf /var/lib/apt/lists/*
 
-# Copy source and build
+# Install solc 0.8.20 static binary (covers ^0.8.x contracts)
+RUN curl -fsSL https://github.com/ethereum/solidity/releases/download/v0.8.20/solc-static-linux \
+    -o /usr/local/bin/solc \
+    && chmod +x /usr/local/bin/solc
+
+# Python dependencies
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
+
+# App source
 COPY . .
-RUN npm run build
 
-# Remove devDependencies after build
-RUN npm prune --omit=dev
+EXPOSE 8000
 
-EXPOSE 8080
-CMD ["node", "dist/index.js"]
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]

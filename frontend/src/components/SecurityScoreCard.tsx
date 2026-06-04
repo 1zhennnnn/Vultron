@@ -4,46 +4,91 @@ import { RiskLevel } from '../types';
 interface Props {
   score: number;
   riskLevel: RiskLevel;
+  compact?: boolean;
 }
 
 function getColors(score: number) {
-  if (score >= 80) return { stroke: '#22c55e', text: 'text-green-400', glow: '#22c55e' };
-  if (score >= 50) return { stroke: '#f97316', text: 'text-orange-400', glow: '#f97316' };
-  return { stroke: '#ef4444', text: 'text-red-400', glow: '#ef4444' };
+  if (score >= 80) return { stroke: '#10b981', textClass: 'text-[#10b981]' };
+  if (score >= 50) return { stroke: '#f97316', textClass: 'text-[#f97316]' };
+  return { stroke: '#ef4444', textClass: 'text-[#ef4444]' };
 }
 
-export default function SecurityScoreCard({ score, riskLevel }: Props) {
-  const { stroke, text, glow } = getColors(score);
-  const radius = 52;
-  const circ = 2 * Math.PI * radius;
+export default function SecurityScoreCard({ score, riskLevel, compact = false }: Props) {
+  const { stroke, textClass } = getColors(score);
+  const radius = 44;
+  const circ   = 2 * Math.PI * radius;
   const offset = circ - (score / 100) * circ;
 
-  return (
-    <div className="flex flex-col items-center gap-2">
-      <div className="relative">
-        <svg width="136" height="136" viewBox="0 0 136 136">
-          <circle cx="68" cy="68" r={radius} fill="none" stroke="#1e1e30" strokeWidth="10" />
+  if (compact) {
+    // Horizontal KPI layout for the top metrics bar
+    return (
+      <div className="flex items-center gap-3">
+        <svg width="56" height="56" viewBox="0 0 56 56">
+          <circle cx="28" cy="28" r={radius * 0.6} fill="none" stroke="#1f2937" strokeWidth="6" />
           <circle
-            cx="68" cy="68" r={radius}
-            fill="none"
-            stroke={stroke}
-            strokeWidth="10"
-            strokeLinecap="round"
+            cx="28" cy="28" r={radius * 0.6}
+            fill="none" stroke={stroke} strokeWidth="6"
+            strokeLinecap="butt"
+            strokeDasharray={circ * 0.6}
+            strokeDashoffset={(circ * 0.6) - (score / 100) * (circ * 0.6)}
+            transform="rotate(-90 28 28)"
+            style={{ transition: 'stroke-dashoffset 1s ease' }}
+          />
+          <text x="28" y="29" textAnchor="middle" dominantBaseline="middle"
+            fill="#e2e8f0" fontSize="13" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+            {score}
+          </text>
+        </svg>
+        <div>
+          <p className="text-[9px] font-bold tracking-widest text-[#64748b] uppercase">Security Score</p>
+          <p className={`text-xs font-bold mt-0.5 ${textClass}`}>{riskLevel}</p>
+        </div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="flex flex-col items-center gap-3">
+      {/* Ring gauge */}
+      <div className="relative">
+        <svg width="120" height="120" viewBox="0 0 120 120">
+          {/* Track */}
+          <circle cx="60" cy="60" r={radius} fill="none" stroke="#1f2937" strokeWidth="8" />
+          {/* Tick marks */}
+          {[0, 20, 40, 60, 80].map(pct => {
+            const angle = ((pct / 100) * 2 * Math.PI) - (Math.PI / 2);
+            const x1 = 60 + (radius - 6) * Math.cos(angle);
+            const y1 = 60 + (radius - 6) * Math.sin(angle);
+            const x2 = 60 + (radius + 2) * Math.cos(angle);
+            const y2 = 60 + (radius + 2) * Math.sin(angle);
+            return <line key={pct} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#374151" strokeWidth="1" />;
+          })}
+          {/* Progress */}
+          <circle
+            cx="60" cy="60" r={radius}
+            fill="none" stroke={stroke} strokeWidth="8"
+            strokeLinecap="butt"
             strokeDasharray={circ}
             strokeDashoffset={offset}
-            transform="rotate(-90 68 68)"
-            style={{
-              transition: 'stroke-dashoffset 1.2s cubic-bezier(.4,0,.2,1)',
-              filter: `drop-shadow(0 0 8px ${glow})`,
-            }}
+            transform="rotate(-90 60 60)"
+            style={{ transition: 'stroke-dashoffset 1.1s cubic-bezier(.4,0,.2,1)' }}
           />
-          <text x="68" y="63" textAnchor="middle" dominantBaseline="middle" fill="white" fontSize="30" fontWeight="700" fontFamily="Sora, sans-serif">{score}</text>
-          <text x="68" y="84" textAnchor="middle" dominantBaseline="middle" fill="#64748b" fontSize="11" fontFamily="Sora, sans-serif">/ 100</text>
+          {/* Score number */}
+          <text x="60" y="56" textAnchor="middle" dominantBaseline="middle"
+            fill="#e2e8f0" fontSize="26" fontWeight="700" fontFamily="JetBrains Mono, monospace">
+            {score}
+          </text>
+          <text x="60" y="74" textAnchor="middle" dominantBaseline="middle"
+            fill="#64748b" fontSize="10" fontFamily="Inter, sans-serif" letterSpacing="2">
+            / 100
+          </text>
         </svg>
       </div>
+
+      {/* Labels */}
       <div className="text-center">
-        <p className="text-xs text-slate-500">Security Score</p>
-        <p className={`text-sm font-semibold mt-0.5 ${text}`}>{riskLevel}</p>
+        <p className="text-[9px] font-bold tracking-widest text-[#64748b] uppercase">Security Score</p>
+        <p className={`text-sm font-bold tracking-wide mt-0.5 ${textClass}`}>{riskLevel}</p>
       </div>
     </div>
   );

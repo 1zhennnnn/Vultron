@@ -24,3 +24,21 @@ Thumbs.db
 # Vite cache
 .vite/
 **/.vite/
+
+# Python
+__pycache__/
+**/__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.egg-info/
+
+# Local env overrides (never commit — set real values in Railway/Vercel dashboard)
+frontend/.env.local
+frontend/.env.*.local
+
+# Test artifacts
+backend/_analysis_dump.json
+backend/test_results*.json
+backend/rou
