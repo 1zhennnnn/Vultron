@@ -38,7 +38,7 @@ function MatrixRain() {
     const P_SPACING   = 11;
     const FONT_SIZE   = 120;
     const TITLE_COLOR = '#1f1';
-    const PHASE_DURS  = [100, 80, 120, 100];
+    const PHASE_DURS  = [100, 80, 300, 130];
 
     interface Particle {
       x: number; y: number;
