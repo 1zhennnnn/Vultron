@@ -153,6 +153,10 @@ async def init_db():
 
 
 _MIGRATIONS = [
+    # contracts table
+    "ALTER TABLE contracts ADD COLUMN IF NOT EXISTS solidity_version    VARCHAR(20)",
+    # analyses table — new columns added across v4 rounds
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS user_id              INTEGER REFERENCES users(id) ON DELETE SET NULL",
     "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS consensus_rate       FLOAT   DEFAULT 0.0",
     "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS high_conf_paths      INTEGER DEFAULT 0",
     "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS low_conf_paths       INTEGER DEFAULT 0",
