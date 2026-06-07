@@ -13,6 +13,10 @@ build/
 !.env.example
 !**/.env.example
 
+# Local env overrides
+frontend/.env.local
+frontend/.env.*.local
+
 # Logs
 *.log
 npm-debug.log*
@@ -25,6 +29,9 @@ Thumbs.db
 .vite/
 **/.vite/
 
+# TypeScript
+*.tsbuildinfo
+
 # Python
 __pycache__/
 **/__pycache__/
@@ -34,11 +41,21 @@ __pycache__/
 .Python
 *.egg-info/
 
-# Local env overrides (never commit — set real values in Railway/Vercel dashboard)
-frontend/.env.local
-frontend/.env.*.local
+# Python virtual environments
+venv/
+.venv/
+env/
+.env.bak
+
+# Pytest / coverage
+.pytest_cache/
+htmlcov/
+.coverage
+.coverage.*
 
 # Test artifacts
 backend/_analysis_dump.json
 backend/test_results*.json
-backend/rou
+
+# Slither temp files
+vultron_*.sol
