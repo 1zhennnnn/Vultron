@@ -21,7 +21,7 @@ async def lifespan(app: FastAPI):
     await close_db()
 
 
-app = FastAPI(title="Vultron v3", lifespan=lifespan)
+app = FastAPI(title="Vultron v4", lifespan=lifespan)
 
 _origins = [
     "http://localhost:5173",
@@ -77,7 +77,7 @@ async def health():
     groq_ok = await _ping_groq()
     return {
         "status": "ok",
-        "service": "Vultron v3",
+        "service": "Vultron v4",
         "groq": "ok" if groq_ok else "error",
         "db": "configured" if os.getenv("DATABASE_URL") else "missing",
     }
@@ -85,7 +85,7 @@ async def health():
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "8000"))
-    print(f"Vultron v3 backend running on port {port}")
+    print(f"Vultron v4 backend running on port {port}")
     if not os.getenv("GROQ_API_KEY"):
         print("WARNING: GROQ_API_KEY is not set — AI features will fail")
     uvicorn.run("main:app", host="0.0.0.0", port=port, reload=False)
