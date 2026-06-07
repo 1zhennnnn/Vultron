@@ -8,7 +8,7 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from database import init_db, close_db
+from database import init_db, close_db, run_migrations
 from routers import analyze, analyses
 from routers.auth import router as auth_router
 from ws_manager import active_connections
@@ -17,6 +17,7 @@ from ws_manager import active_connections
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await run_migrations()
     yield
     await close_db()
 

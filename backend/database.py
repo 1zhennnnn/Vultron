@@ -152,6 +152,39 @@ async def init_db():
     print("Database tables initialized")
 
 
+_MIGRATIONS = [
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS consensus_rate       FLOAT   DEFAULT 0.0",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS high_conf_paths      INTEGER DEFAULT 0",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS low_conf_paths       INTEGER DEFAULT 0",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS slither_ms           INTEGER DEFAULT 0",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS groq_ms              INTEGER DEFAULT 0",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS engine               VARCHAR(50)",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS complexity_score     INTEGER",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS complexity_level     VARCHAR(10)",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS summary              TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS attack_strategy_json TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS defense_recs_json    TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS score_explanation    TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS causal_paths_json    TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS critical_path_id     TEXT",
+    "ALTER TABLE analyses ADD COLUMN IF NOT EXISTS poc_script           TEXT",
+]
+
+
+async def run_migrations():
+    from sqlalchemy import text
+    engine = _get_engine()
+    if engine is None:
+        return
+    try:
+        async with engine.begin() as conn:
+            for sql in _MIGRATIONS:
+                await conn.execute(text(sql))
+        print("Migrations applied")
+    except Exception as e:
+        print(f"Migration warning (non-fatal): {e}")
+
+
 async def close_db():
     """Gracefully dispose the asyncpg connection pool.
     Call this from FastAPI lifespan shutdown to avoid abrupt disconnections on Neon.
