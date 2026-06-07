@@ -117,6 +117,11 @@ export default function ReportPage() {
       getAnalysisById(analysisId)
         .then(data => setReport(data))
         .catch(() => setReport(null));
+    } else {
+      const saved = localStorage.getItem('vultron_last_report');
+      if (saved) {
+        try { setReport(JSON.parse(saved)); } catch { setReport(null); }
+      }
     }
   }, [location.search]);
 

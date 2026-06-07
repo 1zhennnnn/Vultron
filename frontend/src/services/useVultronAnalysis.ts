@@ -43,6 +43,7 @@ export function useVultronAnalysis(initialCode: string) {
       const result = await analyzeContractWithProgress(contractCode, setProgress, analysisLanguage);
       const resultWithLang: FullAnalysisResult = { ...result, analysisLanguage };
       setResults(resultWithLang);
+      localStorage.setItem('vultron_last_report', JSON.stringify(resultWithLang));
     } catch (err) {
       setError('Analysis failed. Check your connection and GROQ_API_KEY.');
     } finally {
