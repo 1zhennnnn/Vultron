@@ -1,12 +1,35 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import { LayoutDashboard, ScanSearch, FileText, ShieldAlert } from 'lucide-react';
+import { LayoutDashboard, ScanSearch, FileText, ShieldAlert, Settings } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import LanguageToggle from './LanguageToggle';
+import { logout } from '../services/api';
+
+const BASE = import.meta.env.VITE_API_URL ?? 'http://localhost:8001';
+
+type GroqStatus = 'checking' | 'ok' | 'error';
 
 export default function Sidebar() {
   const loc = useLocation();
   const { t } = useTranslation();
+  const email = localStorage.getItem('vultron_email');
+  const [groqStatus, setGroqStatus] = useState<GroqStatus>('checking');
+
+  useEffect(() => {
+    let cancelled = false;
+    const check = async () => {
+      try {
+        const res = await fetch(`${BASE}/api/health`, { signal: AbortSignal.timeout(6000) });
+        const json = await res.json();
+        if (!cancelled) setGroqStatus(json.groq === 'ok' ? 'ok' : 'error');
+      } catch {
+        if (!cancelled) setGroqStatus('error');
+      }
+    };
+    check();
+    const timer = setInterval(check, 60_000);
+    return () => { cancelled = true; clearInterval(timer); };
+  }, []);
 
   const nav = [
     { icon: LayoutDashboard, labelKey: 'sidebar.dashboard',        to: '/dashboard'      },
@@ -33,6 +56,7 @@ export default function Sidebar() {
           '/analyzer':       'ANALYZER',
           '/report':         'REPORT',
           '/vulnerabilities':'VULN_DB',
+          '/account':        'ACCOUNT',
         };
         const label = labels[loc.pathname];
         return label ? (
@@ -72,17 +96,42 @@ export default function Sidebar() {
       {/* Footer */}
       <div className="p-3 border-t border-[#222222] flex flex-col gap-2">
         <LanguageToggle />
-        <div className="px-3 py-2 border border-[#222222] bg-[rgba(0,255,65,0.03)]">
-          <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 bg-[#00ff41] animate-pulse flex-shrink-0" />
-            <p className="text-[10px] text-[#00ff41] font-bold uppercase tracking-wider" style={{ fontFamily: "'Courier New', monospace" }}>
-              Engine Active
-            </p>
-          </div>
-          <p className="text-[9px] text-[#555555] mt-0.5" style={{ fontFamily: "'Courier New', monospace" }}>
-            Groq Llama-3.1
-          </p>
-        </div>
+        <Link
+          to="/account"
+          style={{ fontFamily: "'Courier New', monospace" }}
+          className={`flex items-center gap-2 px-3 py-2 text-[10px] uppercase tracking-wide border transition-colors ${
+            loc.pathname === '/account'
+              ? 'border-[#333333] text-[#00ff41] bg-[rgba(0,255,65,0.05)]'
+              : 'border-[#1e1e1e] text-[#555555] hover:text-[#888888] hover:border-[#2a2a2a]'
+          }`}
+        >
+          <Settings size={11} />
+          {t('sidebar.account')}
+        </Link>
+        {(() => {
+          const cfg = {
+            ok:       { dot: '#00ff41', label: 'Engine Active',    sub: 'Groq Llama-3.1',   border: '#222222', bg: 'rgba(0,255,65,0.03)',  pulse: true  },
+            error:    { dot: '#ef4444', label: 'Engine Offline',   sub: 'Groq unreachable', border: '#3f1111', bg: 'rgba(239,68,68,0.04)', pulse: false },
+            checking: { dot: '#555555', label: 'Checking...',      sub: 'Groq Llama-3.1',   border: '#222222', bg: 'transparent',          pulse: true  },
+          }[groqStatus];
+          return (
+            <div style={{ padding: '8px 12px', border: `1px solid ${cfg.border}`, background: cfg.bg }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <span style={{
+                  width: 6, height: 6, borderRadius: '50%', background: cfg.dot, flexShrink: 0,
+                  animation: cfg.pulse ? 'pulse 2s cubic-bezier(0.4,0,0.6,1) infinite' : 'none',
+                }} />
+                <p style={{ fontFamily: "'Courier New', monospace", fontSize: 10, color: cfg.dot, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+                  {cfg.label}
+                </p>
+              </div>
+              <p style={{ fontFamily: "'Courier New', monospace", fontSize: 9, color: '#555555', marginTop: 3 }}>
+                {cfg.sub}
+              </p>
+            </div>
+          );
+        })()}
+
       </div>
     </aside>
   );

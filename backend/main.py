@@ -8,8 +8,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
-from database import init_db
+from database import init_db, close_db
 from routers import analyze, analyses
+from routers.auth import router as auth_router
 from ws_manager import active_connections
 
 
@@ -17,6 +18,7 @@ from ws_manager import active_connections
 async def lifespan(app: FastAPI):
     await init_db()
     yield
+    await close_db()
 
 
 app = FastAPI(title="Vultron v3", lifespan=lifespan)
@@ -32,12 +34,13 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=_origins,
     allow_origin_regex=r"https://.*\.(vercel|netlify)\.app",
-    allow_methods=["GET", "POST"],
+    allow_methods=["GET", "POST", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["*"],
 )
 
 app.include_router(analyze.router, prefix="/api")
 app.include_router(analyses.router, prefix="/api")
+app.include_router(auth_router)
 
 
 @app.websocket("/ws/analysis/{job_id}")
@@ -53,12 +56,29 @@ async def analysis_websocket(websocket: WebSocket, job_id: str):
         active_connections.pop(job_id, None)
 
 
+async def _ping_groq() -> bool:
+    key = os.getenv("GROQ_API_KEY", "")
+    if not key:
+        return False
+    try:
+        import httpx
+        async with httpx.AsyncClient(timeout=5) as client:
+            r = await client.get(
+                "https://api.groq.com/openai/v1/models",
+                headers={"Authorization": f"Bearer {key}"},
+            )
+            return r.status_code == 200
+    except Exception:
+        return False
+
+
 @app.get("/api/health")
 async def health():
+    groq_ok = await _ping_groq()
     return {
         "status": "ok",
         "service": "Vultron v3",
-        "groq": "configured" if os.getenv("GROQ_API_KEY") else "missing",
+        "groq": "ok" if groq_ok else "error",
         "db": "configured" if os.getenv("DATABASE_URL") else "missing",
     }
 

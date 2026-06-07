@@ -3,9 +3,16 @@ from typing import Any, Callable, Awaitable, Dict, List
 
 
 def get_path_key(path: dict) -> str:
-    vuln_type = path.get('vulnerability_type', '') or path.get('to', '')
-    title = path.get('title', '')
-    return f"{vuln_type.lower()}:{title.lower()[:30]}"
+    # Issue #4: match by vulnerability type only, not by AI-generated title prose.
+    # Two AI runs almost always phrase the title differently even for the same vuln,
+    # so using title in the key caused 0% consensus.  Type-only matching correctly
+    # identifies when both runs detected the same underlying vulnerability.
+    vuln_type = (
+        path.get("vulnerability_type", "")
+        or path.get("to", "")
+        or path.get("from", "")
+    )
+    return vuln_type.lower().strip()
 
 
 async def run_consensus_analysis(
@@ -16,7 +23,9 @@ async def run_consensus_analysis(
 ) -> dict:
     """
     Run AI causal path generation twice on the same vulnerability list.
-    Return the intersection as high-confidence results.
+    Paths whose vulnerability type appears in both runs are high-confidence;
+    type-only matching (not title matching) avoids false 0% consensus caused
+    by AI phrasing variance between runs.
     """
     vulnerabilities = slither_result.get('vulnerabilities', [])
 
@@ -78,11 +87,13 @@ async def run_consensus_analysis(
                 'high_confidence_paths': len(paths),
                 'low_confidence_paths': 0,
                 'consensus_rate': 0.5,
-                'note': 'One run failed, using single run result',
+                'note': 'One run failed — using single-run result',
             },
         }
 
     paths_run1, paths_run2 = valid[0], valid[1]
+
+    # Build type→path maps; last writer wins if a type appears twice in one run
     map1 = {get_path_key(p): p for p in paths_run1}
     map2 = {get_path_key(p): p for p in paths_run2}
 
@@ -90,13 +101,15 @@ async def run_consensus_analysis(
     consensus_keys = keys1 & keys2
     single_keys    = keys1 ^ keys2
 
+    # Prefer the run-1 path for consensus entries (run 2 is just confirmation)
     high_conf = [map1[k] for k in consensus_keys]
-    low_conf  = [
-        {**(map1.get(k) or map2.get(k) or {}), 'low_confidence': True}
-        for k in single_keys
-    ]
+    low_conf = []
+    for k in single_keys:
+        path_data = map1.get(k) or map2.get(k)
+        if path_data:                        # skip if both maps returned nothing
+            low_conf.append({**path_data, 'low_confidence': True})
 
-    all_paths = high_conf + low_conf
+    all_paths    = high_conf + low_conf
     total_unique = len(keys1 | keys2)
     consensus_rate = len(consensus_keys) / total_unique if total_unique > 0 else 0.0
 
@@ -114,6 +127,6 @@ async def run_consensus_analysis(
             'high_confidence_paths': len(high_conf),
             'low_confidence_paths': len(low_conf),
             'consensus_rate': round(consensus_rate, 3),
-            'note': f'{len(high_conf)} paths confirmed in both runs',
+            'note': f'{len(high_conf)} path(s) confirmed in both runs',
         },
     }

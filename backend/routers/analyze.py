@@ -5,12 +5,12 @@ import traceback
 from datetime import datetime, timezone
 from typing import Any, List, Optional
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Header
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ValidationError
 
-from analyzers.slither_runner import run_slither, map_slither_to_vulnerabilities, detect_solidity_version
-from analyzers.score_calculator import calculate_score, calculate_weighted_score, get_risk_level
+from analyzers.slither_runner import run_slither, map_slither_to_vulnerabilities, detect_solidity_version, SWC_MAP, CWE_MAP
+from analyzers.score_calculator import calculate_weighted_score, get_risk_level
 from analyzers.causal_engine import build_attack_narrative, generate_ai_causal_paths
 from analyzers.consensus_engine import run_consensus_analysis
 from analyzers.exploitability_analyzer import run_exploitability_analysis
@@ -33,6 +33,14 @@ from models.schemas import AnalyzeRequest, APIResponse
 router = APIRouter()
 
 
+def _get_user_id(authorization: Optional[str]) -> Optional[int]:
+    if not authorization or not authorization.startswith("Bearer "):
+        return None
+    from routers.auth import verify_token
+    payload = verify_token(authorization.removeprefix("Bearer "))
+    return payload["user_id"] if payload else None
+
+
 class CopilotRequest(BaseModel):
     question: str
     vulnerabilities: Optional[List[Any]] = []
@@ -46,7 +54,7 @@ def _extract_contract_name(code: str) -> str:
 
 
 @router.post("/analyze")
-async def handle_analyze(req: AnalyzeRequest):
+async def handle_analyze(req: AnalyzeRequest, authorization: Optional[str] = Header(None)):
     t_total_start = time.time()
     code = req.code  # already validated and stripped by the Pydantic model
     job_id = req.job_id
@@ -67,18 +75,28 @@ async def handle_analyze(req: AnalyzeRequest):
         slither_result: dict = {"success": False, "detectors": [], "solidity_version": "unknown", "solc_used": ""}
         try:
             slither_result = await run_slither(code)
-            vulnerabilities = map_slither_to_vulnerabilities(slither_result["detectors"])
+            vulnerabilities = map_slither_to_vulnerabilities(slither_result["detectors"], code)
             slither_success = slither_result["success"]
             print(f"Slither: {len(vulnerabilities)} findings")
         except Exception as e:
             print(f"Slither error, falling back to AI: {e}")
         slither_ms = round((time.time() - t_slither_start) * 1000)
 
-        # AI fallback if Slither finds nothing
-        if len(vulnerabilities) == 0:
-            print("Slither found nothing — running AI fallback scan")
+        # AI fallback ONLY when Slither failed to run (not when it ran and found nothing — safe contract)
+        if len(vulnerabilities) == 0 and not slither_success:
+            print("Slither failed — running AI fallback scan")
             vulnerabilities = await analyze_contract_with_ai(code, language=language)
             print(f"AI scan: {len(vulnerabilities)} findings")
+
+        # Ensure SWC + CWE IDs are present on all vulnerabilities (AI-fallback path
+        # doesn't go through map_slither_to_vulnerabilities which adds them).
+        for v in vulnerabilities:
+            if not v.get('swc_id'):
+                swc_info = SWC_MAP.get(v.get('type', ''), {})
+                v['swc_id']    = swc_info.get('swc_id')
+                v['swc_title'] = swc_info.get('swc_title')
+            if not v.get('cwe_id'):
+                v['cwe_id'] = CWE_MAP.get(v.get('type', ''))
 
         # ── Stage 3: Exploitability + complexity analysis ─────────────────
         await send_progress(job_id, 3, TOTAL_STEPS, "Analyzing exploitability...")
@@ -94,28 +112,33 @@ async def handle_analyze(req: AnalyzeRequest):
         contract_name = _extract_contract_name(code)
         await send_progress(job_id, 4, TOTAL_STEPS, "AI consensus analysis run 1/2...")
         t_groq_start = time.time()
-        (
-            summary,
-            attack_strategy,
-            defense_recommendations,
-            score_explanation,
-            causal_result,
-            poc_script,
-        ) = await asyncio.gather(
+
+        async def _ai_paths_fn(vulns):
+            return await generate_ai_causal_paths(
+                vulns, lambda p: ask_groq(p, 2000), language=language, contract_code=code
+            )
+
+        causal_result = await run_consensus_analysis(
+            slither_result={'vulnerabilities': vulnerabilities},
+            contract_code=code,
+            generate_ai_paths_fn=_ai_paths_fn,
+            runs=2,
+        )
+
+        _ai_results = await asyncio.gather(
             generate_security_summary(code, vulnerabilities, language=language),
             generate_attack_strategy(vulnerabilities, language=language),
             generate_defense_recommendations(vulnerabilities, language=language),
             generate_score_explanation(security_score, vulnerabilities, language=language),
-            run_consensus_analysis(
-                slither_result={'vulnerabilities': vulnerabilities},
-                contract_code=code,
-                generate_ai_paths_fn=lambda vulns: generate_ai_causal_paths(
-                    vulns, lambda p: ask_groq(p, 2000), language=language
-                ),
-                runs=2,
-            ),
-            generate_poc_script(contract_name, vulnerabilities, code, lambda prompt: ask_groq(prompt, 2000), language=language),
+            generate_poc_script(contract_name, vulnerabilities, code, lambda p: ask_groq(p, 2000), language=language),
+            return_exceptions=True,
         )
+        summary                 = _ai_results[0] if not isinstance(_ai_results[0], Exception) else ""
+        attack_strategy         = _ai_results[1] if not isinstance(_ai_results[1], Exception) else {"steps": []}
+        defense_recommendations = _ai_results[2] if not isinstance(_ai_results[2], Exception) else []
+        score_explanation       = _ai_results[3] if not isinstance(_ai_results[3], Exception) else ""
+        poc_script              = _ai_results[4] if not isinstance(_ai_results[4], Exception) else ""
+
         groq_ms = round((time.time() - t_groq_start) * 1000)
         print(f"Causal paths: {len(causal_result['paths'])}")
         print(f"PoC: {len(poc_script)} chars")
@@ -128,7 +151,7 @@ async def handle_analyze(req: AnalyzeRequest):
         }
 
         # ── Stage 5: Hallucination validation (sync, fast) ────────────────
-        await send_progress(job_id, 5, TOTAL_STEPS, "AI consensus analysis run 2/2...")
+        await send_progress(job_id, 5, TOTAL_STEPS, "Validating AI output...")
         t_validation_start = time.time()
         hall_result = validate_hallucination(causal_result["paths"], vulnerabilities)
         validation_ms = round((time.time() - t_validation_start) * 1000)
@@ -172,7 +195,7 @@ async def handle_analyze(req: AnalyzeRequest):
 
         # ── Stage 6: DB save ──────────────────────────────────────────────
         await send_progress(job_id, 6, TOTAL_STEPS, "Saving results...", status="done")
-        await save_analysis(result, code)
+        await save_analysis(result, code, user_id=_get_user_id(authorization))
         active_connections.pop(job_id, None)
 
         return APIResponse.success(result)

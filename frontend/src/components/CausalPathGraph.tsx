@@ -207,6 +207,18 @@ export default function CausalPathGraph({ paths, criticalPathId, onNodeClick, co
             {activePath.severity}
           </span>
         )}
+        {activePath.evidence_confidence && (
+          <span className={`text-[9px] font-mono px-1.5 py-0.5 border ${
+            activePath.evidence_confidence === 'HIGH'
+              ? 'border-[#10b981] text-[#10b981] bg-[rgba(16,185,129,0.08)]'
+              : activePath.evidence_confidence === 'MEDIUM'
+              ? 'border-[#f59e0b] text-[#f59e0b] bg-[rgba(245,158,11,0.08)]'
+              : 'border-[#6b7280] text-[#6b7280] bg-transparent'
+          }`}>
+            EVIDENCE: {activePath.evidence_confidence}
+            {activePath.evidence_score != null && ` ${activePath.evidence_score}%`}
+          </span>
+        )}
         {activePath.low_confidence && (
           <span className="text-[9px] font-mono text-[#ffaa00]">
             ⚠ [SINGLE_RUN — VERIFY MANUALLY]

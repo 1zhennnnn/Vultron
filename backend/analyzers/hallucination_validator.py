@@ -3,12 +3,23 @@ from typing import Dict, List
 
 ABSTRACT_NODE_TYPES = {"cascade-effect", "final-impact"}
 
+# Paths with more than this fraction of unanchored nodes are flagged unreliable.
+# 0.30 chosen empirically: allows for abstract/compound nodes while
+# still catching wholesale AI fabrication.
+_HALLUCINATION_THRESHOLD = 0.30
+
 
 def validate_hallucination(
     causal_paths: List[Dict],
     slither_findings: List[Dict],
 ) -> Dict:
-    slither_types = {f.get("type", "").replace("-", " ") for f in slither_findings}
+    slither_types = set()
+    for _f in slither_findings:
+        _t = _f.get("type", "")
+        if _t:
+            slither_types.add(_t)                   # "tx-origin"
+            slither_types.add(_t.replace("-", " "))  # "tx origin"
+            slither_types.add(_t.replace("-", "."))  # "tx.origin"
     slither_funcs = {f.get("function", "").lower() for f in slither_findings if f.get("function")}
     slither_lines = {f.get("lineNumber") for f in slither_findings if f.get("lineNumber")}
 
@@ -76,7 +87,7 @@ def validate_hallucination(
     hallucination_rate = (
         hallucination_count / total_checkable_nodes if total_checkable_nodes > 0 else 0.0
     )
-    validation_passed = hallucination_rate < 0.30
+    validation_passed = hallucination_rate < _HALLUCINATION_THRESHOLD
 
     return {
         "validation_passed": validation_passed,

@@ -10,6 +10,17 @@ SEVERITY_PENALTY = {
 
 
 def calculate_score(vulnerabilities: List[Any]) -> int:
+    """
+    DEPRECATED — use calculate_weighted_score() instead.
+    This version ignores exploitability and produces inflated penalties.
+    Kept temporarily for backward compatibility; will be removed in next cleanup.
+    """
+    import warnings
+    warnings.warn(
+        "calculate_score() is deprecated; use calculate_weighted_score()",
+        DeprecationWarning,
+        stacklevel=2,
+    )
     penalty = sum(SEVERITY_PENALTY.get(v.get("severity", ""), 0) for v in vulnerabilities)
     return max(0, 100 - penalty)
 

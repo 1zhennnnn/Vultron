@@ -136,6 +136,7 @@ export default function MainDashboard() {
   // Remediation tab state
   const [activeRemediation, setActiveRemediation] = useState<string | null>(null);
   const [activeSubTabs, setActiveSubTabs] = useState<Record<string, 'description' | 'fix' | 'reference'>>({});
+  const [activeTiers, setActiveTiers] = useState<Record<string, 'SIMPLE' | 'STANDARD' | 'ENTERPRISE'>>({});
 
   const {
     code, setCode, results, loading, error, progress, runAnalysis,
@@ -302,7 +303,8 @@ export default function MainDashboard() {
                   // CONTRACT_EDITOR
                 </span>
                 <span className="text-[9px]" style={{ color: '#555555', fontFamily: "'Courier New', monospace" }}>Vultron_Sandbox.sol</span>
-                <div className="flex gap-1">
+                <div className="flex gap-1 items-center">
+                  <span className="text-[8px] text-[#444444] tracking-widest mr-1" style={{ fontFamily: "'Courier New', monospace" }}>DEMO:</span>
                   {Object.keys(CONTRACTS).map(k => (
                     <button
                       key={k}
@@ -319,6 +321,22 @@ export default function MainDashboard() {
                       {k}
                     </button>
                   ))}
+                  <span className="text-[#333333] mx-1">|</span>
+                  <button
+                    onClick={() => { setCode(''); setActiveDemo(null); }}
+                    className="text-[9px] px-2 py-0.5 border transition-all uppercase tracking-widest font-bold"
+                    style={{
+                      fontFamily: "'Courier New', monospace",
+                      borderColor: '#333333',
+                      background: 'transparent',
+                      color: '#555555',
+                      borderRadius: 0,
+                    }}
+                    onMouseEnter={e => { (e.target as HTMLButtonElement).style.color = '#aaaaaa'; (e.target as HTMLButtonElement).style.borderColor = '#555555'; }}
+                    onMouseLeave={e => { (e.target as HTMLButtonElement).style.color = '#555555'; (e.target as HTMLButtonElement).style.borderColor = '#333333'; }}
+                  >
+                    CLEAR
+                  </button>
                 </div>
               </div>
               <button
@@ -334,7 +352,7 @@ export default function MainDashboard() {
               <div className="h-[260px]">
                 <CodeEditorPanel
                   value={code}
-                  onChange={setCode}
+                  onChange={v => { setCode(v); setActiveDemo(null); }}
                   selectedVulnerability={selectedVulnerability}
                 />
               </div>
@@ -706,26 +724,77 @@ export default function MainDashboard() {
                             </div>
                           )}
 
-                          {subTab === 'fix' && (
-                            <div className="grid grid-cols-2 gap-2">
+                          {subTab === 'fix' && (() => {
+                            const activeTier = activeTiers[vuln.id] ?? 'SIMPLE';
+                            const tieredFix = template?.tiered_fixes?.find(t => t.tier === activeTier);
+                            const TIER_COLOR: Record<string, string> = {
+                              SIMPLE: '#10b981', STANDARD: '#3b82f6', ENTERPRISE: '#a855f7',
+                            };
+
+                            if (!template?.tiered_fixes?.length) {
+                              return (
+                                <div className="grid grid-cols-2 gap-2">
+                                  <div>
+                                    <p className="text-[8px] font-bold tracking-widest mb-1.5 font-mono" style={{ color: '#ff4444' }}>❌ VULNERABLE</p>
+                                    <pre className="font-mono text-[9px] text-[#ff4444] bg-[#1a0a0a] border border-[rgba(255,68,68,0.25)] p-2 overflow-auto max-h-[130px] leading-relaxed whitespace-pre-wrap">
+                                      {template?.vulnerable_pattern ?? defense?.codeExample ?? '// No pattern on record'}
+                                    </pre>
+                                  </div>
+                                  <div>
+                                    <p className="text-[8px] font-bold tracking-widest mb-1.5 font-mono" style={{ color: '#00ff41' }}>✅ FIXED</p>
+                                    <pre className="font-mono text-[9px] text-[#00ff41] bg-[#0a1a0a] border border-[rgba(0,255,65,0.25)] p-2 overflow-auto max-h-[130px] leading-relaxed whitespace-pre-wrap">
+                                      {template?.fixed_pattern ?? '// Refer to the strategy above'}
+                                    </pre>
+                                  </div>
+                                </div>
+                              );
+                            }
+
+                            return (
                               <div>
-                                <p className="text-[8px] font-bold tracking-widest mb-1.5 font-mono" style={{ color: '#ff4444' }}>
-                                  ❌ VULNERABLE
-                                </p>
-                                <pre className="font-mono text-[9px] text-[#ff4444] bg-[#1a0a0a] border border-[rgba(255,68,68,0.25)] p-2 overflow-auto max-h-[130px] leading-relaxed whitespace-pre-wrap">
-                                  {template?.vulnerable_pattern ?? defense?.codeExample ?? '// No pattern on record'}
-                                </pre>
+                                {/* Tier selector */}
+                                <div className="flex gap-1 mb-3">
+                                  {(['SIMPLE', 'STANDARD', 'ENTERPRISE'] as const).map(tier => (
+                                    <button
+                                      key={tier}
+                                      onClick={() => setActiveTiers(prev => ({ ...prev, [vuln.id]: tier }))}
+                                      className="text-[8px] font-bold tracking-widest px-2.5 py-1 border transition-all"
+                                      style={{
+                                        fontFamily: "'Courier New', monospace",
+                                        borderColor: activeTier === tier ? TIER_COLOR[tier] : '#2a2a2a',
+                                        color: activeTier === tier ? TIER_COLOR[tier] : '#555555',
+                                        background: activeTier === tier ? `${TIER_COLOR[tier]}14` : 'transparent',
+                                      }}
+                                    >
+                                      {tier}
+                                    </button>
+                                  ))}
+                                </div>
+
+                                {tieredFix && (
+                                  <>
+                                    <p className="text-[10px] text-[#94a3b8] font-mono mb-2 leading-relaxed">{tieredFix.description}</p>
+                                    <div className="space-y-1 mb-3">
+                                      {tieredFix.steps.map((step, i) => (
+                                        <div key={i} className="flex items-start gap-2">
+                                          <span className="text-[9px] font-mono text-[#555555] flex-shrink-0">[{String(i + 1).padStart(2, '0')}]</span>
+                                          <span className="text-[10px] text-[#64748b] font-mono leading-relaxed">{step}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                    {tieredFix.code_snippet && (
+                                      <pre className="font-mono text-[9px] text-[#00ff41] bg-[#0a1a0a] border border-[rgba(0,255,65,0.2)] p-2 overflow-auto max-h-[100px] leading-relaxed whitespace-pre-wrap">
+                                        {tieredFix.code_snippet}
+                                      </pre>
+                                    )}
+                                    <p className="text-[9px] text-[#555555] font-mono mt-2">
+                                      Estimated effort: <span className="text-[#888888]">{tieredFix.estimated_effort}</span>
+                                    </p>
+                                  </>
+                                )}
                               </div>
-                              <div>
-                                <p className="text-[8px] font-bold tracking-widest mb-1.5 font-mono" style={{ color: '#00ff41' }}>
-                                  ✅ FIXED
-                                </p>
-                                <pre className="font-mono text-[9px] text-[#00ff41] bg-[#0a1a0a] border border-[rgba(0,255,65,0.25)] p-2 overflow-auto max-h-[130px] leading-relaxed whitespace-pre-wrap">
-                                  {template?.fixed_pattern ?? '// Refer to the strategy above'}
-                                </pre>
-                              </div>
-                            </div>
-                          )}
+                            );
+                          })()}
 
                           {subTab === 'reference' && (
                             template?.oz_link ? (

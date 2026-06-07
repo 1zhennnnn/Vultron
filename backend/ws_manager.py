@@ -1,6 +1,9 @@
+import logging
 from typing import Dict, Optional
 
 from fastapi import WebSocket
+
+logger = logging.getLogger(__name__)
 
 active_connections: Dict[str, WebSocket] = {}
 
@@ -24,5 +27,6 @@ async def send_progress(
                 "status": status,
                 "percent": round(step / total * 100),
             })
-        except Exception:
+        except Exception as _e:
             active_connections.pop(job_id, None)
+            logger.debug(f"WebSocket {job_id} disconnected: {_e}")

@@ -13,6 +13,10 @@ export interface Vulnerability {
   exploitability_level?: 'HIGH' | 'MEDIUM' | 'LOW';
   exploitability_conditions?: Array<{ condition: string; weight: number; met: boolean }>;
   exploitability_summary?: string;
+  swc_id?: string;
+  swc_title?: string;
+  cwe_id?: string;
+  source_check?: string;
 }
 
 export interface AttackStrategy {
@@ -53,6 +57,8 @@ export interface CausalPath {
   title?: string;
   severity?: string;
   low_confidence?: boolean;
+  evidence_score?: number;
+  evidence_confidence?: 'HIGH' | 'MEDIUM' | 'LOW';
   // AI-enriched fields
   summary?: string;
   nodes?: CausalNode[];

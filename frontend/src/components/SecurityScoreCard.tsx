@@ -15,7 +15,7 @@ function getColors(score: number) {
 
 export default function SecurityScoreCard({ score, riskLevel, compact = false }: Props) {
   const { stroke, textClass } = getColors(score);
-  const radius = 44;
+  const radius = 40;
   const circ   = 2 * Math.PI * radius;
   const offset = circ - (score / 100) * circ;
 
@@ -51,16 +51,16 @@ export default function SecurityScoreCard({ score, riskLevel, compact = false }:
     <div className="flex flex-col items-center gap-3">
       {/* Ring gauge */}
       <div className="relative">
-        <svg width="120" height="120" viewBox="0 0 120 120">
+        <svg width="120" height="120" viewBox="-6 -6 132 132" overflow="visible">
           {/* Track */}
           <circle cx="60" cy="60" r={radius} fill="none" stroke="#1f2937" strokeWidth="8" />
           {/* Tick marks */}
           {[0, 20, 40, 60, 80].map(pct => {
             const angle = ((pct / 100) * 2 * Math.PI) - (Math.PI / 2);
-            const x1 = 60 + (radius - 6) * Math.cos(angle);
-            const y1 = 60 + (radius - 6) * Math.sin(angle);
-            const x2 = 60 + (radius + 2) * Math.cos(angle);
-            const y2 = 60 + (radius + 2) * Math.sin(angle);
+            const x1 = 60 + (radius - 5) * Math.cos(angle);
+            const y1 = 60 + (radius - 5) * Math.sin(angle);
+            const x2 = 60 + (radius + 5) * Math.cos(angle);
+            const y2 = 60 + (radius + 5) * Math.sin(angle);
             return <line key={pct} x1={x1} y1={y1} x2={x2} y2={y2} stroke="#374151" strokeWidth="1" />;
           })}
           {/* Progress */}

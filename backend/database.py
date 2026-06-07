@@ -41,12 +41,24 @@ class Base(DeclarativeBase):
     pass
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id            = Column(Integer, primary_key=True, autoincrement=True)
+    email         = Column(String(255), unique=True, nullable=False, index=True)
+    password_hash = Column(String(255), nullable=False)
+    created_at    = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
+
+    analyses = relationship("AnalysisRecord", back_populates="user")
+
+
 class ContractRecord(Base):
     __tablename__ = "contracts"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
     code_hash = Column(String(64), unique=True, index=True)
+    solidity_version = Column(String(20), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     analyses = relationship("AnalysisRecord", back_populates="contract", cascade="all, delete-orphan")
@@ -62,9 +74,16 @@ class AnalysisRecord(Base):
     vuln_count = Column(Integer, default=0)
     critical_count = Column(Integer, default=0)
     high_count = Column(Integer, default=0)
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=True)
     slither_success = Column(Boolean, default=False)
     total_ms = Column(Integer, default=0)
     hallucination_rate = Column(Float, default=0.0)
+    consensus_rate     = Column(Float,   default=0.0)
+    high_conf_paths    = Column(Integer, default=0)
+    low_conf_paths     = Column(Integer, default=0)
+    slither_ms         = Column(Integer, default=0)
+    groq_ms            = Column(Integer, default=0)
+    engine             = Column(String(50), nullable=True)
     complexity_score = Column(Integer, nullable=True)
     complexity_level = Column(String(10), nullable=True)
     summary = Column(Text, nullable=True)
@@ -77,6 +96,7 @@ class AnalysisRecord(Base):
     analyzed_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
 
     contract = relationship("ContractRecord", back_populates="analyses")
+    user     = relationship("User", back_populates="analyses")
     vulnerabilities = relationship(
         "VulnerabilityRecord", back_populates="analysis", cascade="all, delete-orphan"
     )
@@ -132,6 +152,17 @@ async def init_db():
     print("Database tables initialized")
 
 
+async def close_db():
+    """Gracefully dispose the asyncpg connection pool.
+    Call this from FastAPI lifespan shutdown to avoid abrupt disconnections on Neon.
+    """
+    global _engine
+    if _engine is not None:
+        await _engine.dispose()
+        _engine = None
+        print("Database connection pool closed")
+
+
 async def get_session() -> AsyncGenerator[AsyncSession, None]:
     factory = _get_factory()
     if factory is None:
@@ -140,7 +171,7 @@ async def get_session() -> AsyncGenerator[AsyncSession, None]:
         yield session
 
 
-async def save_analysis(result: dict, code: str) -> None:
+async def save_analysis(result: dict, code: str, user_id: Optional[int] = None) -> Optional[int]:
     factory = _get_factory()
     if factory is None:
         return
@@ -151,9 +182,15 @@ async def save_analysis(result: dict, code: str) -> None:
             stmt = select(ContractRecord).where(ContractRecord.code_hash == code_hash)
             contract = (await session.execute(stmt)).scalar_one_or_none()
             if contract is None:
-                contract = ContractRecord(name=result["contractName"], code_hash=code_hash)
+                contract = ContractRecord(
+                    name=result["contractName"],
+                    code_hash=code_hash,
+                    solidity_version=result.get("solidity_version"),
+                )
                 session.add(contract)
                 await session.flush()
+            else:
+                contract.name = result["contractName"]  # allow rename on re-analysis
 
             vulns = result.get("vulnerabilities", [])
             perf = result.get("performance", {})
@@ -166,6 +203,7 @@ async def save_analysis(result: dict, code: str) -> None:
             poc_script       = result.get("pocScript")
             analysis = AnalysisRecord(
                 contract_id=contract.id,
+                user_id=user_id,
                 security_score=result["securityScore"],
                 risk_level=result["riskLevel"],
                 vuln_count=len(vulns),
@@ -174,6 +212,12 @@ async def save_analysis(result: dict, code: str) -> None:
                 slither_success=result.get("slitherSuccess", False),
                 total_ms=perf.get("total_ms", 0),
                 hallucination_rate=hall.get("hallucination_rate", 0.0),
+                consensus_rate=result.get("consensus", {}).get("consensus_rate", 0.0),
+                high_conf_paths=result.get("consensus", {}).get("high_confidence_paths", 0),
+                low_conf_paths=result.get("consensus", {}).get("low_confidence_paths", 0),
+                slither_ms=perf.get("slither_ms", 0),
+                groq_ms=perf.get("groq_ms", 0),
+                engine="groq/llama-3.1-8b-instant",
                 complexity_score=complexity.get("complexity_score"),
                 complexity_level=complexity.get("complexity_level"),
                 summary=result.get("summary") or None,
@@ -201,5 +245,7 @@ async def save_analysis(result: dict, code: str) -> None:
                 ))
 
             await session.commit()
+            return analysis.id
     except Exception as e:
         print(f"DB save failed (non-fatal): {e}")
+    return None

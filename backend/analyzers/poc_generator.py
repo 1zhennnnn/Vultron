@@ -2,8 +2,6 @@ import re
 import logging
 from typing import Any, Awaitable, Callable, List
 
-from groq_client import ask_groq
-
 logger = logging.getLogger(__name__)
 
 
@@ -29,10 +27,23 @@ async def generate_poc_script(
             "// 建議定期進行人工審計以確保邏輯正確性。"
         )
 
+    _lines = contract_code.split('\n')
+    _focal = [
+        v.get("lineNumber") for v in vulnerabilities
+        if v.get("lineNumber") and v.get("severity") in ("critical", "high", "medium")
+    ]
+    if _focal:
+        _center = min(_focal)
+        _start  = max(0, _center - 10)
+        _end    = min(len(_lines), _center + 50)
+        _snippet = '\n'.join(_lines[_start:_end])
+    else:
+        _snippet = contract_code[:2000]
+
     prompt = f"""You are a smart contract security researcher.
 Given this Solidity contract named "{contract_name}":
 
-{contract_code[:2000]}
+{_snippet}
 
 With these vulnerabilities detected:
 {target_vulns}
@@ -61,7 +72,7 @@ IMPORTANT OUTPUT CONSTRAINTS:
 {"[SYSTEM: 攻擊腳本的行內註解請用繁體中文。程式碼本身保持 JavaScript。]" if language == "zh" else "[SYSTEM: You must respond in English only. Never use Chinese, Traditional Chinese, or any non-English language. English-only responses are mandatory.]"}"""
 
     try:
-        raw = await ask_groq(prompt, 1200)
+        raw = await call_groq(prompt)
         # Strip markdown fences if the model wraps the output
         clean = re.sub(r"```javascript\s*", "", raw)
         clean = re.sub(r"```js\s*", "", clean)

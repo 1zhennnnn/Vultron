@@ -33,6 +33,7 @@ export const en = {
     attackGenerator: 'Attack Sim',
     reports: 'Reports',
     vulnerabilities: 'Vuln DB',
+    account: 'Account',
     copilotActive: 'AI Copilot Active',
     engineLabel: 'Vultron-Sec-v2 Engine',
   },

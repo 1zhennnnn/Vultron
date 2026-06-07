@@ -114,17 +114,9 @@ export default function ReportPage() {
     const analysisId = params.get('id');
 
     if (analysisId) {
-      // Load from DB — no localStorage dependency
       getAnalysisById(analysisId)
         .then(data => setReport(data))
-        .catch(() => {
-          // fallback to localStorage if API fails
-          const saved = localStorage.getItem('vultron_last_report');
-          if (saved) { try { setReport(JSON.parse(saved)); } catch { /* corrupted */ } }
-        });
-    } else {
-      const saved = localStorage.getItem('vultron_last_report');
-      if (saved) { try { setReport(JSON.parse(saved)); } catch { /* corrupted */ } }
+        .catch(() => setReport(null));
     }
   }, [location.search]);
 

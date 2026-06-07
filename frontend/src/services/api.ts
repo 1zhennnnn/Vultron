@@ -3,10 +3,26 @@ import { FullAnalysisResult, Vulnerability } from '../types';
 const BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000') + '/api';
 const WS_BASE = (import.meta.env.VITE_API_URL ?? 'http://localhost:8000').replace(/^http/, 'ws');
 
+export function getAuthToken(): string | null {
+  return localStorage.getItem('vultron_token');
+}
+
+export function getAuthHeaders(): Record<string, string> {
+  const token = getAuthToken();
+  return token ? { Authorization: `Bearer ${token}` } : {};
+}
+
+export function logout() {
+  localStorage.removeItem('vultron_token');
+  localStorage.removeItem('vultron_email');
+  localStorage.removeItem('vultron_last_report');
+  window.location.href = '/login';
+}
+
 async function post<T>(path: string, body: object): Promise<T> {
   const res = await fetch(`${BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
     body: JSON.stringify(body),
   });
   if (!res.ok) {
@@ -19,7 +35,7 @@ async function post<T>(path: string, body: object): Promise<T> {
 }
 
 export async function fetchStats(): Promise<unknown> {
-  const res = await fetch(`${BASE}/analyses/stats`);
+  const res = await fetch(`${BASE}/analyses/stats`, { headers: getAuthHeaders() });
   if (!res.ok) throw new Error(`API error: ${res.status}`);
   const json = await res.json();
   if (json.status === 'error') throw new Error(json.message ?? 'Unknown error');
@@ -43,7 +59,8 @@ export async function analyzeContractWithProgress(
   language: string = 'en',
 ): Promise<FullAnalysisResult> {
   const jobId = crypto.randomUUID();
-  const wsUrl = `${WS_BASE}/ws/analysis/${jobId}`;
+  const token = getAuthToken();
+  const wsUrl = `${WS_BASE}/ws/analysis/${jobId}${token ? `?token=${encodeURIComponent(token)}` : ''}`;
 
   return new Promise((resolve, reject) => {
     let ws: WebSocket | null = null;
@@ -56,7 +73,7 @@ export async function analyzeContractWithProgress(
     ws.onopen = () => {
       fetch(`${BASE}/analyze`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({ code, job_id: jobId, language }),
       })
         .then(r => r.json())
@@ -87,14 +104,14 @@ export async function analyzeContractWithProgress(
 }
 
 export async function getAnalysisById(id: string | number): Promise<FullAnalysisResult> {
-  const res = await fetch(`${BASE}/analyses/${id}`);
+  const res = await fetch(`${BASE}/analyses/${id}`, { headers: getAuthHeaders() });
   const json = await res.json();
   if (json.status === 'error') throw new Error(json.message ?? 'Analysis not found');
   return json.data as FullAnalysisResult;
 }
 
 export async function getContractHistory(contractName: string) {
-  const res = await fetch(`${BASE}/analyses/history/${encodeURIComponent(contractName)}`);
+  const res = await fetch(`${BASE}/analyses/history/${encodeURIComponent(contractName)}`, { headers: getAuthHeaders() });
   const json = await res.json();
   if (json.status === 'error') throw new Error(json.message ?? 'History not found');
   return json.data;

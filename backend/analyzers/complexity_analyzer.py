@@ -12,15 +12,18 @@ def analyze_complexity(code: str, slither_result: dict) -> Dict[str, Any]:
         r'\bfunction\s+\w+[^)]*\)\s+(?:public|external)', code
     ))
 
+    # Approximation: matches common state variable patterns.
+    # immutable/constant modifiers and non-standard indentation may be undercounted.
     state_var_count = len(re.findall(
         r'^\s+(?:uint|int|address|bool|bytes|string|mapping)\w*\s+'
         r'(?:public\s+)?(?:private\s+)?(?:internal\s+)?\w+',
         code, re.MULTILINE,
     ))
 
-    inheritance_count = len(re.findall(
-        r'\bcontract\s+\w+\s+is\s+([^{]+)', code
-    ))
+    inheritance_count = sum(
+        len(m.split(','))
+        for m in re.findall(r'\bcontract\s+\w+\s+is\s+([^{]+)', code)
+    )
 
     external_call_count = len(re.findall(
         r'\.(call|transfer|send|delegatecall|staticcall)\b', code
@@ -29,6 +32,9 @@ def analyze_complexity(code: str, slither_result: dict) -> Dict[str, Any]:
     modifier_count = len(re.findall(r'\bmodifier\s+\w+', code))
     event_count    = len(re.findall(r'\bevent\s+\w+', code))
 
+    # LOC excludes blank lines and single-line comments (//).
+    # Multi-line block comments (/* ... */) are not filtered — LOC may be slightly overstated
+    # for contracts with extensive NatSpec documentation.
     lines = [l for l in code.split('\n') if l.strip() and not l.strip().startswith('//')]
     loc = len(lines)
 
